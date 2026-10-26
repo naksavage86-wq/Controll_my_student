@@ -1,0 +1,6 @@
+{
+  "name": "ប្រព័ន្ធគ្រប់គ្រងសិស្សានុសិស្ស - SchoolPro",
+  "description": "ប្រព័ន្ធគ្រប់គ្រងទិន្នន័យសិស្សានុសិស្ស វត្តមាន ពិន្ទុ ព្រឹត្តិបត្រពិន្ទុ និងថ្លៃសិក្សា ប្រកបដោយប្រសិទ្ធភាពខ្ពស់",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

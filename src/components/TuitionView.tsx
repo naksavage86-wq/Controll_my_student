@@ -1,0 +1,461 @@
+import React, { useState, useMemo } from 'react';
+import {
+  CreditCard,
+  Plus,
+  Printer,
+  CheckCircle2,
+  Clock,
+  AlertCircle,
+  Search,
+  Filter,
+  DollarSign,
+  Receipt,
+  X,
+} from 'lucide-react';
+import { Student, TuitionFee } from '../types';
+import { Language, translations } from '../utils/i18n';
+import { formatSchoolFee } from '../utils/academic';
+import { SCHOOL_INFO } from '../data/mockData';
+
+interface TuitionViewProps {
+  students: Student[];
+  tuitionFees: TuitionFee[];
+  onAddFee: (fee: TuitionFee) => void;
+  onUpdateFee: (fee: TuitionFee) => void;
+  lang: Language;
+}
+
+export const TuitionView: React.FC<TuitionViewProps> = ({
+  students,
+  tuitionFees,
+  onAddFee,
+  onUpdateFee,
+  lang,
+}) => {
+  const t = translations[lang];
+
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [selectedReceipt, setSelectedReceipt] = useState<TuitionFee | null>(null);
+
+  // New Invoice Form state
+  const [newFee, setNewFee] = useState<Partial<TuitionFee>>({
+    studentId: students[0]?.id || '',
+    invoiceNo: `INV-2025-${String(tuitionFees.length + 1001)}`,
+    title: 'ថ្លៃសិក្សាប្រចាំខែវិច្ឆិកា ២០២៤',
+    amount: 120,
+    currency: 'USD',
+    paidAmount: 0,
+    dueDate: '2024-11-05',
+    status: 'pending',
+  });
+
+  // Filtered tuition records
+  const filteredFees = useMemo(() => {
+    return tuitionFees.filter((f) => {
+      if (statusFilter !== 'all' && f.status !== statusFilter) return false;
+      if (searchQuery) {
+        const student = students.find((s) => s.id === f.studentId);
+        const matchName = student?.khmerName.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchCode = student?.code.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchInv = f.invoiceNo.toLowerCase().includes(searchQuery.toLowerCase());
+        if (!matchName && !matchCode && !matchInv) return false;
+      }
+      return true;
+    });
+  }, [tuitionFees, statusFilter, searchQuery, students]);
+
+  // Totals
+  const totalAmount = tuitionFees.reduce((a, b) => a + b.amount, 0);
+  const totalPaid = tuitionFees.reduce((a, b) => a + b.paidAmount, 0);
+  const totalPending = totalAmount - totalPaid;
+
+  const handleCreateInvoice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newFee.studentId || !newFee.amount) return;
+
+    const record: TuitionFee = {
+      id: `fee-${Date.now()}`,
+      studentId: newFee.studentId,
+      invoiceNo: newFee.invoiceNo || `INV-${Date.now()}`,
+      title: newFee.title || 'ថ្លៃសិក្សា',
+      amount: Number(newFee.amount),
+      currency: 'USD',
+      paidAmount: Number(newFee.paidAmount || 0),
+      dueDate: newFee.dueDate || '2024-11-05',
+      status: Number(newFee.paidAmount) >= Number(newFee.amount) ? 'paid' : Number(newFee.paidAmount) > 0 ? 'partial' : 'pending',
+      paymentMethod: newFee.paidAmount ? 'ABA Pay' : undefined,
+      receiptNo: newFee.paidAmount ? `REC-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+    };
+
+    onAddFee(record);
+    setIsAddModalOpen(false);
+  };
+
+  const handleQuickPay = (fee: TuitionFee) => {
+    const updated: TuitionFee = {
+      ...fee,
+      paidAmount: fee.amount,
+      status: 'paid',
+      paidDate: new Date().toISOString().slice(0, 10),
+      paymentMethod: 'ABA Pay',
+      receiptNo: fee.receiptNo || `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+    };
+    onUpdateFee(updated);
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header and Summary Cards */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div>
+          <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+            <CreditCard className="w-5 h-5 text-blue-600" />
+            <span>{t.tuition}</span>
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {lang === 'km'
+              ? 'តាមដានការបង់ថ្លៃសិក្សា ចេញវិក្កយបត្រ និងបោះពុម្ពបង្កាន់ដៃទទួលប្រាក់'
+              : 'Manage student fee invoices, record payments, and print official receipts'}
+          </p>
+        </div>
+
+        <button
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-medium shadow-xs transition-all cursor-pointer"
+        >
+          <Plus className="w-4 h-4" />
+          <span>{lang === 'km' ? 'ចេញវិក្កយបត្រថ្មី' : 'New Invoice'}</span>
+        </button>
+      </div>
+
+      {/* Financial KPI stats */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+          <div className="text-xs text-slate-500 mb-1">{lang === 'km' ? 'ចំនួនវិក្កយបត្រសរុប' : 'Total Invoiced'}</div>
+          <div className="text-2xl font-bold text-slate-900">${totalAmount}</div>
+          <div className="text-xs text-slate-400 mt-1">{tuitionFees.length} {lang === 'km' ? 'ប្រតិបត្តិការ' : 'transactions'}</div>
+        </div>
+
+        <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-200/80 shadow-xs">
+          <div className="text-xs text-emerald-700 mb-1">{lang === 'km' ? 'ប្រាក់បានទទួល (Paid)' : 'Total Received'}</div>
+          <div className="text-2xl font-bold text-emerald-800">${totalPaid}</div>
+          <div className="text-xs text-emerald-600 mt-1">
+            {totalAmount > 0 ? Math.round((totalPaid / totalAmount) * 100) : 0}% {lang === 'km' ? 'ប្រមូលបាន' : 'collected'}
+          </div>
+        </div>
+
+        <div className="bg-amber-50/60 p-4 rounded-xl border border-amber-200/80 shadow-xs">
+          <div className="text-xs text-amber-700 mb-1">{lang === 'km' ? 'នៅជំពាក់ / ហួសកំណត់' : 'Pending & Overdue'}</div>
+          <div className="text-2xl font-bold text-amber-800">${totalPending}</div>
+          <div className="text-xs text-amber-600 mt-1">
+            {tuitionFees.filter((f) => f.status === 'overdue').length} {lang === 'km' ? 'ហួសកាលកំណត់' : 'overdue'}
+          </div>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder={lang === 'km' ? 'ស្វែងរកឈ្មោះសិស្ស អត្តលេខ ឬលេខវិក្កយបត្រ...' : 'Search student, ID, invoice #...'}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-slate-400" />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-lg focus:bg-white font-medium"
+          >
+            <option value="all">{lang === 'km' ? 'ស្ថានភាពទាំងអស់' : 'All Status'}</option>
+            <option value="paid">{t.paid}</option>
+            <option value="partial">{lang === 'km' ? 'បង់ខ្លះ' : 'Partial'}</option>
+            <option value="pending">{t.pending}</option>
+            <option value="overdue">{t.overdue}</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Invoice Table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-xs sm:text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200 font-semibold text-slate-600">
+                <th className="py-3 px-4">{t.invoiceNo}</th>
+                <th className="py-3 px-4">{lang === 'km' ? 'សិស្ស' : 'Student'}</th>
+                <th className="py-3 px-4">{lang === 'km' ? 'ការពិពណ៌នា' : 'Description'}</th>
+                <th className="py-3 px-3 text-right">{t.amount}</th>
+                <th className="py-3 px-3 text-right">{lang === 'km' ? 'បានបង់' : 'Paid'}</th>
+                <th className="py-3 px-4 text-center">{t.status}</th>
+                <th className="py-3 px-4 text-right">{t.actions}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredFees.map((fee) => {
+                const student = students.find((s) => s.id === fee.studentId);
+
+                return (
+                  <tr key={fee.id} className="hover:bg-slate-50/70 transition-colors">
+                    <td className="py-3 px-4 font-mono font-bold text-slate-800">
+                      {fee.invoiceNo}
+                      <div className="text-[11px] text-slate-400 font-sans">កំណត់: {fee.dueDate}</div>
+                    </td>
+
+                    <td className="py-3 px-4">
+                      <div className="font-bold text-slate-900">{student?.khmerName || '—'}</div>
+                      <div className="text-xs text-slate-500 font-mono">{student?.code} • {student?.gradeId}</div>
+                    </td>
+
+                    <td className="py-3 px-4 font-medium text-slate-700">
+                      {fee.title}
+                      {fee.paymentMethod && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px]">
+                          {fee.paymentMethod}
+                        </span>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-3 text-right font-bold text-slate-900 font-mono">
+                      ${fee.amount}
+                    </td>
+
+                    <td className="py-3 px-3 text-right font-bold font-mono text-emerald-700">
+                      ${fee.paidAmount}
+                    </td>
+
+                    <td className="py-3 px-4 text-center">
+                      <span
+                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          fee.status === 'paid'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : fee.status === 'partial'
+                            ? 'bg-blue-100 text-blue-800'
+                            : fee.status === 'overdue'
+                            ? 'bg-rose-100 text-rose-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {fee.status === 'paid'
+                          ? t.paid
+                          : fee.status === 'partial'
+                          ? (lang === 'km' ? 'បង់ខ្លះ' : 'Partial')
+                          : fee.status === 'overdue'
+                          ? t.overdue
+                          : t.pending}
+                      </span>
+                    </td>
+
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        {fee.status !== 'paid' && (
+                          <button
+                            onClick={() => handleQuickPay(fee)}
+                            className="px-2.5 py-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                          >
+                            {lang === 'km' ? 'កត់ត្រាបង់' : 'Pay'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setSelectedReceipt(fee)}
+                          className="p-1.5 text-slate-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Print Receipt"
+                        >
+                          <Receipt className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Modal: Add New Invoice */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-sm">
+                {lang === 'km' ? 'ចេញវិក្កយបត្រថ្មី' : 'Create Fee Invoice'}
+              </h3>
+              <button onClick={() => setIsAddModalOpen(false)}>
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateInvoice} className="p-5 space-y-3.5 text-xs sm:text-sm">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'ជ្រើសរើសសិស្ស' : 'Select Student'} *</label>
+                <select
+                  value={newFee.studentId}
+                  onChange={(e) => setNewFee({ ...newFee, studentId: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 border rounded-lg"
+                >
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.khmerName} ({s.code} - {s.gradeId})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'ចំណងជើងវិក្កយបត្រ' : 'Invoice Title'} *</label>
+                <input
+                  type="text"
+                  value={newFee.title}
+                  onChange={(e) => setNewFee({ ...newFee, title: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">{t.amount} ($) *</label>
+                  <input
+                    type="number"
+                    value={newFee.amount}
+                    onChange={(e) => setNewFee({ ...newFee, amount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-lg font-mono"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'បានបង់ ($)' : 'Paid ($)'}</label>
+                  <input
+                    type="number"
+                    value={newFee.paidAmount}
+                    onChange={(e) => setNewFee({ ...newFee, paidAmount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-lg font-mono"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'កាលបរិច្ឆេទកំណត់បង់' : 'Due Date'} *</label>
+                <input
+                  type="date"
+                  value={newFee.dueDate}
+                  onChange={(e) => setNewFee({ ...newFee, dueDate: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg text-xs font-medium"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-semibold"
+                >
+                  {t.save}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Receipt Modal */}
+      {selectedReceipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-300 overflow-hidden">
+            <div className="no-print p-4 bg-slate-50 border-b flex items-center justify-between">
+              <span className="font-bold text-slate-900 text-sm">
+                {lang === 'km' ? 'បង្កាន់ដៃបង់ប្រាក់ផ្លូវការ' : 'Official Payment Receipt'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => window.print()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium cursor-pointer"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>{t.print}</span>
+                </button>
+                <button onClick={() => setSelectedReceipt(null)} className="p-1 text-slate-400 hover:text-slate-700">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Receipt Sheet */}
+            <div className="p-6 text-slate-900 text-xs sm:text-sm">
+              <div className="text-center border-b pb-4 mb-4">
+                <h4 className="font-moul text-sm text-slate-900">{SCHOOL_INFO.nameKhmer}</h4>
+                <p className="text-[11px] text-slate-500 font-sans">{SCHOOL_INFO.nameEnglish}</p>
+                <h3 className="font-bold text-base mt-2 text-blue-900">
+                  បង្កាន់ដៃទទួលប្រាក់ / OFFICIAL RECEIPT
+                </h3>
+                <p className="font-mono text-xs text-slate-600 mt-0.5">
+                  លេខបង្កាន់ដៃ / No: {selectedReceipt.receiptNo || 'REC-0982'}
+                </p>
+              </div>
+
+              {(() => {
+                const student = students.find((s) => s.id === selectedReceipt.studentId);
+                return (
+                  <div className="space-y-3">
+                    <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                      <span className="text-slate-500">ឈ្មោះសិស្ស (Student):</span>
+                      <span className="font-bold text-slate-900">{student?.khmerName} ({student?.latinName})</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                      <span className="text-slate-500">អត្តលេខ (Student ID):</span>
+                      <span className="font-mono font-bold text-blue-700">{student?.code}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                      <span className="text-slate-500">ថ្នាក់រៀន (Grade):</span>
+                      <span className="font-bold text-slate-800">{student?.gradeId}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                      <span className="text-slate-500">ការពិពណ៌នា (Details):</span>
+                      <span className="font-medium text-slate-800">{selectedReceipt.title}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-slate-100 pb-1.5">
+                      <span className="text-slate-500">វិធីទូទាត់ (Payment Method):</span>
+                      <span className="font-medium text-slate-800">{selectedReceipt.paymentMethod || 'ABA Pay'}</span>
+                    </div>
+                    <div className="flex justify-between py-2 bg-emerald-50 px-3 rounded-lg border border-emerald-200">
+                      <span className="font-bold text-emerald-900">ទឹកប្រាក់បានបង់ (Amount Paid):</span>
+                      <span className="font-mono font-bold text-base text-emerald-700">${selectedReceipt.paidAmount}</span>
+                    </div>
+
+                    <div className="pt-6 grid grid-cols-2 text-center text-[11px] text-slate-600">
+                      <div>
+                        <p>ហត្ថលេខាអ្នកបង់ប្រាក់</p>
+                        <div className="h-12" />
+                        <p className="font-medium">{student?.parentName}</p>
+                      </div>
+                      <div>
+                        <p>ហត្ថលេខា និងត្រាបេឡា</p>
+                        <div className="h-12" />
+                        <p className="font-medium">បេឡាធិការសាលា</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
