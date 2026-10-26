@@ -372,16 +372,130 @@ export const StudentModal: React.FC<StudentModalProps> = ({
             </div>
           </div>
 
+          {/* Section 4: Health & Biometrics */}
+          <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200/60 space-y-3">
+            <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🩺 {lang === 'km' ? 'ព័ត៌មានសុខភាព & កាយសម្បទា' : 'Health & Biometrics'}</span>
+            </h4>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {lang === 'km' ? 'ក្រុមឈាម' : 'Blood Type'}
+                </label>
+                <select
+                  value={formData.bloodType || 'O+'}
+                  onChange={(e) => setFormData({ ...formData, bloodType: e.target.value })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                >
+                  <option value="O+">O+</option>
+                  <option value="A+">A+</option>
+                  <option value="B+">B+</option>
+                  <option value="AB+">AB+</option>
+                  <option value="O-">O-</option>
+                  <option value="A-">A-</option>
+                  <option value="B-">B-</option>
+                  <option value="AB-">AB-</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {lang === 'km' ? 'កម្ពស់ (cm)' : 'Height (cm)'}
+                </label>
+                <input
+                  type="number"
+                  placeholder="155"
+                  value={formData.heightCm || ''}
+                  onChange={(e) => setFormData({ ...formData, heightCm: Number(e.target.value) })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {lang === 'km' ? 'ទម្ងន់ (kg)' : 'Weight (kg)'}
+                </label>
+                <input
+                  type="number"
+                  placeholder="48"
+                  value={formData.weightKg || ''}
+                  onChange={(e) => setFormData({ ...formData, weightKg: Number(e.target.value) })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {lang === 'km' ? 'អាឡែកហ្ស៊ី' : 'Allergies'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="ឧ. គ្រឿងសមុទ្រ..."
+                  value={formData.allergies || ''}
+                  onChange={(e) => setFormData({ ...formData, allergies: e.target.value })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                {lang === 'km' ? 'ជំងឺប្រចាំកាយ (បើមាន)' : 'Chronic Condition / Medications'}
+              </label>
+              <input
+                type="text"
+                placeholder="ឧ. ជំងឺហឺត ឬអាឡែកហ្ស៊ីធូលី..."
+                value={formData.chronicCondition || ''}
+                onChange={(e) => setFormData({ ...formData, chronicCondition: e.target.value })}
+                className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Section 5: Discipline & Achievements */}
+          <div className="bg-indigo-50/50 p-4 rounded-xl border border-indigo-200/60 space-y-3">
+            <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+              <span>🎖️ {lang === 'km' ? 'ស្នាដៃកិត្តិយស & ការកត់ត្រាវិន័យ' : 'Merits & Discipline'}</span>
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {lang === 'km' ? 'ស្នាដៃ / លិខិតសរសើរ' : 'Merits & Honors'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="ឧ. ជ័យលាភីគណិតវិទ្យា, សិស្សគំរូ..."
+                  value={Array.isArray(formData.merits) ? formData.merits.join(', ') : formData.merits || ''}
+                  onChange={(e) => setFormData({ ...formData, merits: e.target.value ? e.target.value.split(',').map((s) => s.trim()) : [] })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {lang === 'km' ? 'ការព្រមានវិន័យ (បើមាន)' : 'Disciplinary Warnings'}
+                </label>
+                <input
+                  type="text"
+                  placeholder="ឧ. មកយឺតញឹកញាប់, មិនធ្វើកិច្ចការ..."
+                  value={Array.isArray(formData.warnings) ? formData.warnings.join(', ') : formData.warnings || ''}
+                  onChange={(e) => setFormData({ ...formData, warnings: e.target.value ? e.target.value.split(',').map((s) => s.trim()) : [] })}
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-rose-700"
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Notes */}
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              {lang === 'km' ? 'កំណត់សម្គាល់បន្ថែម (សុខភាព/អាកប្បកិរិយា)' : 'Special Notes / Health'}
+              {lang === 'km' ? 'កំណត់សម្គាល់បន្ថែម (Special Notes)' : 'Special Notes'}
             </label>
             <textarea
               rows={2}
               value={formData.notes || ''}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder={lang === 'km' ? 'ឧ. មានជំងឺអាឡែកហ្ស៊ី ឬជាសិស្សពូកែ...' : 'Notes...'}
+              placeholder={lang === 'km' ? 'ឧ. មានទេពកោសល្យពិសេស ឬត្រូវការការយកចិត្តទុកដាក់...' : 'Notes...'}
               className="w-full px-3 py-2 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>

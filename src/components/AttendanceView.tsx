@@ -35,6 +35,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
 
   const [selectedGrade, setSelectedGrade] = useState<string>(classes[0]?.id || '7A');
   const [selectedDate, setSelectedDate] = useState<string>('2025-10-24');
+  const [selectedSession, setSelectedSession] = useState<'morning' | 'afternoon' | 'full'>('morning');
   const [saveSuccess, setSaveSuccess] = useState(false);
 
   // Filter students by selected grade
@@ -42,16 +43,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
     return students.filter((s) => s.gradeId === selectedGrade && s.status === 'active');
   }, [students, selectedGrade]);
 
-  // Find existing record for this date and grade or initialize
+  // Find existing record for this date, grade, and session or initialize
   const existingRecord = useMemo(() => {
-    return attendanceRecords.find((r) => r.date === selectedDate && r.gradeId === selectedGrade);
-  }, [attendanceRecords, selectedDate, selectedGrade]);
+    return attendanceRecords.find(
+      (r) =>
+        r.date === selectedDate &&
+        r.gradeId === selectedGrade &&
+        (r.session || 'morning') === selectedSession
+    );
+  }, [attendanceRecords, selectedDate, selectedGrade, selectedSession]);
 
   // Current working statuses
   const [currentStatuses, setCurrentStatuses] = useState<Record<string, AttendanceStatus>>({});
   const [note, setNote] = useState<string>('');
 
-  // Sync state when date or grade changes
+  // Sync state when date, grade, or session changes
   React.useEffect(() => {
     if (existingRecord) {
       setCurrentStatuses(existingRecord.records);
@@ -66,7 +72,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       setNote('');
     }
     setSaveSuccess(false);
-  }, [existingRecord, selectedDate, selectedGrade, gradeStudents]);
+  }, [existingRecord, selectedDate, selectedGrade, selectedSession, gradeStudents]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
     setCurrentStatuses((prev) => ({
@@ -90,6 +96,7 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       id: existingRecord?.id || `att-${Date.now()}`,
       date: selectedDate,
       gradeId: selectedGrade,
+      session: selectedSession,
       records: currentStatuses,
       note: note.trim() || undefined,
     };
@@ -137,8 +144,48 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
           </p>
         </div>
 
-        {/* Date and Grade Selection Controls */}
+        {/* Date, Grade and Session Controls */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Shift / Session Pills */}
+          <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setSelectedSession('morning')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedSession === 'morning'
+                  ? 'bg-amber-500 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>☀️</span>
+              <span>{lang === 'km' ? 'វេនព្រឹក' : 'Morning'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedSession('afternoon')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedSession === 'afternoon'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>🌤️</span>
+              <span>{lang === 'km' ? 'វេនរសៀល' : 'Afternoon'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedSession('full')}
+              className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedSession === 'full'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <span>📅</span>
+              <span>{lang === 'km' ? 'ពេញមួយថ្ងៃ' : 'Full Day'}</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl">
             <CalendarIcon className="w-4 h-4 text-slate-500" />
             <input
@@ -223,8 +270,21 @@ export const AttendanceView: React.FC<AttendanceViewProps> = ({
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         {/* Table top action bar */}
         <div className="p-4 bg-slate-50/80 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-          <div className="text-xs sm:text-sm font-semibold text-slate-700">
-            {lang === 'km' ? 'បញ្ជីវត្តមានសិស្ស' : 'Student Roll Call'}: {classes.find((c) => c.id === selectedGrade)?.name} ({gradeStudents.length} {lang === 'km' ? 'នាក់' : 'students'})
+          <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm font-semibold text-slate-700">
+            <span>{lang === 'km' ? 'បញ្ជីវត្តមានសិស្ស' : 'Student Roll Call'}: {classes.find((c) => c.id === selectedGrade)?.name} ({gradeStudents.length} {lang === 'km' ? 'នាក់' : 'students'})</span>
+            <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+              selectedSession === 'morning'
+                ? 'bg-amber-100 text-amber-800'
+                : selectedSession === 'afternoon'
+                ? 'bg-indigo-100 text-indigo-800'
+                : 'bg-blue-100 text-blue-800'
+            }`}>
+              {selectedSession === 'morning'
+                ? (lang === 'km' ? '☀️ វេនព្រឹក (០៧:០០ - ១១:៣០)' : '☀️ Morning Shift')
+                : selectedSession === 'afternoon'
+                ? (lang === 'km' ? '🌤️ វេនរសៀល (១៣:០០ - ១៧:៣០)' : '🌤️ Afternoon Shift')
+                : (lang === 'km' ? '📅 ពេញមួយថ្ងៃ' : '📅 Full Day')}
+            </span>
           </div>
 
           <div className="flex items-center gap-2">

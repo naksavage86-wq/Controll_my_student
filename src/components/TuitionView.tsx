@@ -11,36 +11,56 @@ import {
   DollarSign,
   Receipt,
   X,
+  Edit2,
+  Trash2,
+  Settings,
+  Layers,
+  Save,
 } from 'lucide-react';
-import { Student, TuitionFee } from '../types';
+import { Student, TuitionFee, GradeClass, ClassPricing } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { formatSchoolFee } from '../utils/academic';
-import { SCHOOL_INFO } from '../data/mockData';
+import { SCHOOL_INFO, INITIAL_PRICING } from '../data/mockData';
 
 interface TuitionViewProps {
   students: Student[];
+  classes: GradeClass[];
   tuitionFees: TuitionFee[];
+  classPricing: Record<string, ClassPricing>;
   onAddFee: (fee: TuitionFee) => void;
   onUpdateFee: (fee: TuitionFee) => void;
+  onDeleteFee: (feeId: string) => void;
+  onUpdatePricing: (pricing: Record<string, ClassPricing>) => void;
+  onBatchGenerateFees: (newFees: TuitionFee[]) => void;
   lang: Language;
 }
 
 export const TuitionView: React.FC<TuitionViewProps> = ({
   students,
+  classes,
   tuitionFees,
+  classPricing,
   onAddFee,
   onUpdateFee,
+  onDeleteFee,
+  onUpdatePricing,
+  onBatchGenerateFees,
   lang,
 }) => {
   const t = translations[lang];
 
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  
+  // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<TuitionFee | null>(null);
+  const [editingFee, setEditingFee] = useState<TuitionFee | null>(null);
 
-  // New Invoice Form state
-  const [newFee, setNewFee] = useState<Partial<TuitionFee>>({
+  // New or Edit Invoice Form state
+  const [feeForm, setFeeForm] = useState<Partial<TuitionFee>>({
     studentId: students[0]?.id || '',
     invoiceNo: `INV-2025-${String(tuitionFees.length + 1001)}`,
     title: 'ថ្លៃសិក្សាប្រចាំខែវិច្ឆិកា ២០២៤',
@@ -50,6 +70,21 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
     dueDate: '2024-11-05',
     status: 'pending',
   });
+
+  // Working copy for Pricing Settings modal
+  const [tempPricing, setTempPricing] = useState<Record<string, ClassPricing>>(classPricing);
+
+  // Batch invoicing state
+  const [batchClassId, setBatchClassId] = useState<string>(classes[0]?.id || '7A');
+  const [batchMonthTitle, setBatchMonthTitle] = useState<string>('ថ្លៃសិក្សាខែធ្នូ ២០២៤');
+  const [batchDueDate, setBatchDueDate] = useState<string>('2024-12-05');
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
 
   // Filtered tuition records
   const filteredFees = useMemo(() => {
@@ -71,25 +106,70 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
   const totalPaid = tuitionFees.reduce((a, b) => a + b.paidAmount, 0);
   const totalPending = totalAmount - totalPaid;
 
-  const handleCreateInvoice = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newFee.studentId || !newFee.amount) return;
-
-    const record: TuitionFee = {
-      id: `fee-${Date.now()}`,
-      studentId: newFee.studentId,
-      invoiceNo: newFee.invoiceNo || `INV-${Date.now()}`,
-      title: newFee.title || 'ថ្លៃសិក្សា',
-      amount: Number(newFee.amount),
+  const handleOpenAdd = () => {
+    setEditingFee(null);
+    setFeeForm({
+      studentId: students[0]?.id || '',
+      invoiceNo: `INV-2025-${String(tuitionFees.length + 1001)}`,
+      title: 'ថ្លៃសិក្សាប្រចាំខែវិច្ឆិកា ២០២៤',
+      amount: classPricing['7A']?.monthlyFee || 120,
       currency: 'USD',
-      paidAmount: Number(newFee.paidAmount || 0),
-      dueDate: newFee.dueDate || '2024-11-05',
-      status: Number(newFee.paidAmount) >= Number(newFee.amount) ? 'paid' : Number(newFee.paidAmount) > 0 ? 'partial' : 'pending',
-      paymentMethod: newFee.paidAmount ? 'ABA Pay' : undefined,
-      receiptNo: newFee.paidAmount ? `REC-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
-    };
+      paidAmount: 0,
+      dueDate: '2024-11-05',
+      status: 'pending',
+    });
+    setIsAddModalOpen(true);
+  };
 
-    onAddFee(record);
+  const handleOpenEdit = (fee: TuitionFee) => {
+    setEditingFee(fee);
+    setFeeForm(fee);
+    setIsAddModalOpen(true);
+  };
+
+  const handleSaveInvoice = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!feeForm.studentId || !feeForm.amount) return;
+
+    if (editingFee) {
+      // Update
+      const updated: TuitionFee = {
+        ...editingFee,
+        ...feeForm,
+        amount: Number(feeForm.amount),
+        paidAmount: Number(feeForm.paidAmount || 0),
+        status:
+          Number(feeForm.paidAmount) >= Number(feeForm.amount)
+            ? 'paid'
+            : Number(feeForm.paidAmount) > 0
+            ? 'partial'
+            : 'pending',
+      };
+      onUpdateFee(updated);
+      showToast(lang === 'km' ? 'បានកែសម្រួលវិក្កយបត្រដោយជោគជ័យ!' : 'Invoice updated!');
+    } else {
+      // Create new
+      const record: TuitionFee = {
+        id: `fee-${Date.now()}`,
+        studentId: feeForm.studentId,
+        invoiceNo: feeForm.invoiceNo || `INV-${Date.now()}`,
+        title: feeForm.title || 'ថ្លៃសិក្សា',
+        amount: Number(feeForm.amount),
+        currency: 'USD',
+        paidAmount: Number(feeForm.paidAmount || 0),
+        dueDate: feeForm.dueDate || '2024-11-05',
+        status:
+          Number(feeForm.paidAmount) >= Number(feeForm.amount)
+            ? 'paid'
+            : Number(feeForm.paidAmount) > 0
+            ? 'partial'
+            : 'pending',
+        paymentMethod: feeForm.paidAmount ? 'ABA Pay' : undefined,
+        receiptNo: feeForm.paidAmount ? `REC-${Math.floor(1000 + Math.random() * 9000)}` : undefined,
+      };
+      onAddFee(record);
+      showToast(lang === 'km' ? 'បានចេញវិក្កយបត្រថ្មីដោយជោគជ័យ!' : 'New invoice created!');
+    }
     setIsAddModalOpen(false);
   };
 
@@ -103,12 +183,48 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
       receiptNo: fee.receiptNo || `REC-${Math.floor(1000 + Math.random() * 9000)}`,
     };
     onUpdateFee(updated);
+    showToast(lang === 'km' ? 'បានកត់ត្រាការបង់ប្រាក់ពេញលេញ!' : 'Payment recorded!');
+  };
+
+  // Save Pricing Settings
+  const handleSavePricing = (e: React.FormEvent) => {
+    e.preventDefault();
+    onUpdatePricing(tempPricing);
+    setIsPricingModalOpen(false);
+    showToast(lang === 'km' ? 'បានរក្សាទុកតារាងតម្លៃសិក្សាថ្មី!' : 'Tuition pricing updated!');
+  };
+
+  // Batch generate invoices for class
+  const handleBatchGenerate = (e: React.FormEvent) => {
+    e.preventDefault();
+    const classStudents = students.filter((s) => s.gradeId === batchClassId && s.status === 'active');
+    const pricing = classPricing[batchClassId] || { monthlyFee: 120, currency: 'USD' };
+
+    const newInvoices: TuitionFee[] = classStudents.map((s, idx) => ({
+      id: `fee-batch-${Date.now()}-${s.id}`,
+      studentId: s.id,
+      invoiceNo: `INV-${batchClassId}-${Date.now().toString().slice(-4)}${idx + 1}`,
+      title: batchMonthTitle,
+      amount: pricing.monthlyFee,
+      currency: 'USD',
+      paidAmount: 0,
+      dueDate: batchDueDate,
+      status: 'pending',
+    }));
+
+    onBatchGenerateFees(newInvoices);
+    setIsBatchModalOpen(false);
+    showToast(
+      lang === 'km'
+        ? `បានចេញវិក្កយបត្រចំនួន ${newInvoices.length} សម្រាប់ថ្នាក់ ${batchClassId} រួចរាល់!`
+        : `Generated ${newInvoices.length} invoices for grade ${batchClassId}!`
+    );
   };
 
   return (
     <div className="space-y-6">
       {/* Header and Summary Cards */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs no-print">
         <div>
           <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-blue-600" />
@@ -116,22 +232,98 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
             {lang === 'km'
-              ? 'តាមដានការបង់ថ្លៃសិក្សា ចេញវិក្កយបត្រ និងបោះពុម្ពបង្កាន់ដៃទទួលប្រាក់'
-              : 'Manage student fee invoices, record payments, and print official receipts'}
+              ? 'កំណត់តម្លៃសិក្សា ចេញវិក្កយបត្រ តាមដានការបង់ប្រាក់ និងបោះពុម្ពបង្កាន់ដៃ'
+              : 'Configure school fees, invoice students, track payments, and print receipts'}
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-medium shadow-xs transition-all cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          <span>{lang === 'km' ? 'ចេញវិក្កយបត្រថ្មី' : 'New Invoice'}</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Configure Tuition Pricing button */}
+          <button
+            onClick={() => {
+              setTempPricing(classPricing);
+              setIsPricingModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+          >
+            <Settings className="w-4 h-4 text-blue-600" />
+            <span>{lang === 'km' ? 'កំណត់តម្លៃសាលា' : 'Fee Settings'}</span>
+          </button>
+
+          {/* Batch invoice generator */}
+          <button
+            onClick={() => setIsBatchModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+          >
+            <Layers className="w-4 h-4 text-indigo-600" />
+            <span>{lang === 'km' ? 'ចេញវិក្កយបត្រទាំងថ្នាក់' : 'Batch Invoicing'}</span>
+          </button>
+
+          {/* New single invoice button */}
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-medium shadow-xs transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>{lang === 'km' ? 'ចេញវិក្កយបត្រថ្មី' : 'New Invoice'}</span>
+          </button>
+        </div>
+      </div>
+
+      {toastMessage && (
+        <div className="bg-emerald-50 text-emerald-800 text-xs px-4 py-2.5 rounded-xl border border-emerald-200 flex items-center gap-2 no-print">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Tuition Pricing Cards Banner */}
+      <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white p-5 rounded-2xl shadow-sm no-print">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 className="font-bold text-sm sm:text-base flex items-center gap-2">
+              <DollarSign className="w-4 h-4 text-amber-400" />
+              <span>{lang === 'km' ? 'តារាងតម្លៃសិក្សាស្តង់ដារតាមកម្រិតថ្នាក់ (School Tuition Rates)' : 'Standard Tuition Pricing'}</span>
+            </h3>
+            <p className="text-xs text-blue-200">
+              {lang === 'km' ? 'តម្លៃសិក្សាប្រចាំខែត្រូវបានកំណត់តាមថ្នាក់នីមួយៗ' : 'Configured rates applied during monthly invoicing'}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              setTempPricing(classPricing);
+              setIsPricingModalOpen(true);
+            }}
+            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-xs font-semibold rounded-lg border border-white/20 transition-colors cursor-pointer"
+          >
+            {lang === 'km' ? 'កែប្រែតម្លៃ ✏️' : 'Edit Rates ✏️'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {classes.map((c) => {
+            const pricing = classPricing[c.id] || { monthlyFee: 120, currency: 'USD' };
+            return (
+              <div key={c.id} className="bg-white/10 p-3.5 rounded-xl border border-white/10">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-sm text-white">{c.name}</span>
+                  <span className="text-xs text-blue-200 font-medium">/ {lang === 'km' ? 'ខែ' : 'mo'}</span>
+                </div>
+                <div className="text-2xl font-bold text-amber-300 font-mono">
+                  ${pricing.monthlyFee}
+                </div>
+                <div className="text-[11px] text-blue-200 mt-1 flex justify-between">
+                  <span>{lang === 'km' ? 'សម្ភារៈ' : 'Materials'}: ${pricing.materialFee || 0}</span>
+                  <span>{lang === 'km' ? 'ចុះឈ្មោះ' : 'Registration'}: ${pricing.registrationFee || 0}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Financial KPI stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 no-print">
         <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
           <div className="text-xs text-slate-500 mb-1">{lang === 'km' ? 'ចំនួនវិក្កយបត្រសរុប' : 'Total Invoiced'}</div>
           <div className="text-2xl font-bold text-slate-900">${totalAmount}</div>
@@ -156,7 +348,7 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-3">
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-wrap items-center gap-3 no-print">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -271,6 +463,24 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
                         >
                           <Receipt className="w-4 h-4" />
                         </button>
+                        <button
+                          onClick={() => handleOpenEdit(fee)}
+                          className="p-1.5 text-slate-600 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Invoice"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (window.confirm(lang === 'km' ? 'តើអ្នកប្រាកដថាចង់លុបវិក្កយបត្រនេះទេ?' : 'Delete invoice?')) {
+                              onDeleteFee(fee.id);
+                            }
+                          }}
+                          className="p-1.5 text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Invoice"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -281,26 +491,33 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
         </div>
       </div>
 
-      {/* Modal: Add New Invoice */}
+      {/* Modal 1: Add or Edit Invoice */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
               <h3 className="font-bold text-slate-900 text-sm">
-                {lang === 'km' ? 'ចេញវិក្កយបត្រថ្មី' : 'Create Fee Invoice'}
+                {editingFee
+                  ? (lang === 'km' ? 'កែសម្រួលវិក្កយបត្រ' : 'Edit Fee Invoice')
+                  : (lang === 'km' ? 'ចេញវិក្កយបត្រថ្មី' : 'Create Fee Invoice')}
               </h3>
               <button onClick={() => setIsAddModalOpen(false)}>
                 <X className="w-4 h-4 text-slate-400" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateInvoice} className="p-5 space-y-3.5 text-xs sm:text-sm">
+            <form onSubmit={handleSaveInvoice} className="p-5 space-y-3.5 text-xs sm:text-sm">
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'ជ្រើសរើសសិស្ស' : 'Select Student'} *</label>
                 <select
-                  value={newFee.studentId}
-                  onChange={(e) => setNewFee({ ...newFee, studentId: e.target.value })}
+                  value={feeForm.studentId}
+                  onChange={(e) => {
+                    const st = students.find((s) => s.id === e.target.value);
+                    const defaultFee = st ? classPricing[st.gradeId]?.monthlyFee || 120 : 120;
+                    setFeeForm({ ...feeForm, studentId: e.target.value, amount: defaultFee });
+                  }}
                   className="w-full px-3 py-2 bg-slate-50 border rounded-lg"
+                  disabled={Boolean(editingFee)}
                 >
                   {students.map((s) => (
                     <option key={s.id} value={s.id}>
@@ -314,8 +531,8 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
                 <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'ចំណងជើងវិក្កយបត្រ' : 'Invoice Title'} *</label>
                 <input
                   type="text"
-                  value={newFee.title}
-                  onChange={(e) => setNewFee({ ...newFee, title: e.target.value })}
+                  value={feeForm.title}
+                  onChange={(e) => setFeeForm({ ...feeForm, title: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg"
                   required
                 />
@@ -326,9 +543,9 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
                   <label className="block font-semibold text-slate-700 mb-1">{t.amount} ($) *</label>
                   <input
                     type="number"
-                    value={newFee.amount}
-                    onChange={(e) => setNewFee({ ...newFee, amount: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-lg font-mono"
+                    value={feeForm.amount}
+                    onChange={(e) => setFeeForm({ ...feeForm, amount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-lg font-mono font-bold"
                     required
                   />
                 </div>
@@ -336,9 +553,9 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
                   <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'បានបង់ ($)' : 'Paid ($)'}</label>
                   <input
                     type="number"
-                    value={newFee.paidAmount}
-                    onChange={(e) => setNewFee({ ...newFee, paidAmount: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border rounded-lg font-mono"
+                    value={feeForm.paidAmount}
+                    onChange={(e) => setFeeForm({ ...feeForm, paidAmount: Number(e.target.value) })}
+                    className="w-full px-3 py-2 border rounded-lg font-mono font-bold text-emerald-700"
                   />
                 </div>
               </div>
@@ -347,8 +564,8 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
                 <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'កាលបរិច្ឆេទកំណត់បង់' : 'Due Date'} *</label>
                 <input
                   type="date"
-                  value={newFee.dueDate}
-                  onChange={(e) => setNewFee({ ...newFee, dueDate: e.target.value })}
+                  value={feeForm.dueDate}
+                  onChange={(e) => setFeeForm({ ...feeForm, dueDate: e.target.value })}
                   className="w-full px-3 py-2 border rounded-lg"
                 />
               </div>
@@ -357,15 +574,197 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg text-xs font-medium"
+                  className="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg text-xs font-medium cursor-pointer"
                 >
                   {t.cancel}
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-semibold"
+                  className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-semibold cursor-pointer"
                 >
                   {t.save}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 2: Edit Class Pricing Settings */}
+      {isPricingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Settings className="w-4 h-4 text-blue-600" />
+                <span>{lang === 'km' ? 'កំណត់តម្លៃសិក្សាស្តង់ដារតាមកម្រិតថ្នាក់' : 'Configure Class Tuition Rates'}</span>
+              </h3>
+              <button onClick={() => setIsPricingModalOpen(false)}>
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSavePricing} className="p-5 space-y-4 text-xs sm:text-sm">
+              <p className="text-xs text-slate-500">
+                {lang === 'km'
+                  ? 'កំណត់តម្លៃថ្លៃសិក្សាប្រចាំខែ ថ្លៃសម្ភារៈ និងថ្លៃចុះឈ្មោះសម្រាប់ថ្នាក់នីមួយៗ'
+                  : 'Set standard monthly tuition, materials, and registration fees for each grade level'}
+              </p>
+
+              <div className="space-y-3">
+                {classes.map((c) => {
+                  const current = tempPricing[c.id] || { gradeId: c.id, monthlyFee: 120, currency: 'USD', materialFee: 30, registrationFee: 20 };
+                  return (
+                    <div key={c.id} className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2">
+                      <div className="font-bold text-slate-900 text-sm">{c.name}</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                            {lang === 'km' ? 'ថ្លៃប្រចាំខែ ($)' : 'Monthly ($)'} *
+                          </label>
+                          <input
+                            type="number"
+                            value={current.monthlyFee}
+                            onChange={(e) =>
+                              setTempPricing({
+                                ...tempPricing,
+                                [c.id]: { ...current, monthlyFee: Number(e.target.value) },
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 bg-white border rounded-lg font-mono font-bold"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                            {lang === 'km' ? 'សម្ភារៈ ($)' : 'Materials ($)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={current.materialFee || 0}
+                            onChange={(e) =>
+                              setTempPricing({
+                                ...tempPricing,
+                                [c.id]: { ...current, materialFee: Number(e.target.value) },
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 bg-white border rounded-lg font-mono"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-slate-600 mb-0.5">
+                            {lang === 'km' ? 'ចុះឈ្មោះ ($)' : 'Registration ($)'}
+                          </label>
+                          <input
+                            type="number"
+                            value={current.registrationFee || 0}
+                            onChange={(e) =>
+                              setTempPricing({
+                                ...tempPricing,
+                                [c.id]: { ...current, registrationFee: Number(e.target.value) },
+                              })
+                            }
+                            className="w-full px-2.5 py-1.5 bg-white border rounded-lg font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsPricingModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg text-xs font-medium cursor-pointer"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg text-xs font-semibold cursor-pointer flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>{t.save}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal 3: Batch Class Invoicing */}
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs no-print">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Layers className="w-4 h-4 text-indigo-600" />
+                <span>{lang === 'km' ? 'ចេញវិក្កយបត្រប្រចាំខែសម្រាប់ថ្នាក់ទាំងមូល' : 'Batch Class Invoicing'}</span>
+              </h3>
+              <button onClick={() => setIsBatchModalOpen(false)}>
+                <X className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+
+            <form onSubmit={handleBatchGenerate} className="p-5 space-y-4 text-xs sm:text-sm">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'ជ្រើសរើសថ្នាក់' : 'Select Class'} *</label>
+                <select
+                  value={batchClassId}
+                  onChange={(e) => setBatchClassId(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border rounded-lg font-medium"
+                >
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} (តម្លៃ ${classPricing[c.id]?.monthlyFee || 120}/ខែ)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'ចំណងជើងវិក្កយបត្រ' : 'Invoice Title'} *</label>
+                <input
+                  type="text"
+                  value={batchMonthTitle}
+                  onChange={(e) => setBatchMonthTitle(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">{lang === 'km' ? 'កាលបរិច្ឆេទកំណត់បង់' : 'Due Date'} *</label>
+                <input
+                  type="date"
+                  value={batchDueDate}
+                  onChange={(e) => setBatchDueDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                  required
+                />
+              </div>
+
+              <div className="p-3 bg-blue-50 text-blue-900 rounded-xl text-xs">
+                {lang === 'km'
+                  ? `ប្រព័ន្ធនឹងបង្កើតវិក្កយបត្រស្វ័យប្រវត្តិតាមតម្លៃ $${classPricing[batchClassId]?.monthlyFee || 120} សម្រាប់សិស្សសកម្មទាំងអស់ក្នុងថ្នាក់នេះ។`
+                  : `Invoices will be automatically created using the standard rate of $${classPricing[batchClassId]?.monthlyFee || 120} for all enrolled students.`}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setIsBatchModalOpen(false)}
+                  className="px-4 py-2 text-slate-600 bg-slate-100 rounded-lg text-xs font-medium cursor-pointer"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg text-xs font-semibold cursor-pointer"
+                >
+                  {lang === 'km' ? 'បង្កើតវិក្កយបត្រភ្លាម' : 'Generate Invoices'}
                 </button>
               </div>
             </form>

@@ -11,8 +11,9 @@ import {
   Clock,
   Sparkles,
   CheckCircle2,
+  GraduationCap,
 } from 'lucide-react';
-import { Student, GradeClass, ExamTermScore, DailyAttendance, TuitionFee } from '../types';
+import { Student, GradeClass, ExamTermScore, DailyAttendance, TuitionFee, Teacher } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { calculateClassRanks, calculateAttendanceSummary, formatSchoolFee } from '../utils/academic';
 
@@ -22,6 +23,7 @@ interface DashboardViewProps {
   examScores: ExamTermScore[];
   attendance: DailyAttendance[];
   tuitionFees: TuitionFee[];
+  teachers?: Teacher[];
   lang: Language;
   onNavigate: (tab: any) => void;
   onSelectStudent: (studentId: string) => void;
@@ -121,6 +123,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               <Award className="w-4 h-4" />
               <span>{lang === 'km' ? 'បញ្ចូលពិន្ទុ & ចំណាត់ថ្នាក់' : 'Manage Gradebook'}</span>
+            </button>
+            <button
+              onClick={() => onNavigate('teachers')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs sm:text-sm font-medium rounded-xl border border-white/20 transition-all cursor-pointer"
+            >
+              <GraduationCap className="w-4 h-4" />
+              <span>{lang === 'km' ? 'ប្រវត្តិរូបគ្រូបង្រៀន' : 'Teacher Profiles'}</span>
             </button>
           </div>
         </div>

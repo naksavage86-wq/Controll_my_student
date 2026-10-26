@@ -16,8 +16,22 @@ import { ReportCardView } from './components/ReportCardView';
 import { TuitionView } from './components/TuitionView';
 import { TimetableView } from './components/TimetableView';
 import { SchoolSettingsView } from './components/SchoolSettingsView';
+import { DeveloperProfileModal } from './components/DeveloperProfileModal';
+import { TeacherManagementView } from './components/TeacherManagementView';
+import { AuthView } from './components/AuthView';
 
-import { Student, GradeClass, ExamTermScore, DailyAttendance, TuitionFee } from './types';
+import {
+  Student,
+  GradeClass,
+  ExamTermScore,
+  DailyAttendance,
+  TuitionFee,
+  TimetableSlot,
+  ClassPricing,
+  DeveloperProfile,
+  Teacher,
+  UserAccount,
+} from './types';
 import { Language } from './utils/i18n';
 import {
   INITIAL_STUDENTS,
@@ -25,14 +39,26 @@ import {
   INITIAL_EXAM_SCORES,
   INITIAL_ATTENDANCE,
   INITIAL_FEES,
+  INITIAL_TIMETABLE,
+  INITIAL_PRICING,
+  INITIAL_DEVELOPER,
+  INITIAL_TEACHERS,
+  INITIAL_USERS,
 } from './data/mockData';
 
 const STORAGE_KEYS = {
-  STUDENTS: 'schoolpro_students_v1',
-  EXAM_SCORES: 'schoolpro_exam_scores_v1',
-  ATTENDANCE: 'schoolpro_attendance_v1',
-  FEES: 'schoolpro_fees_v1',
-  LANG: 'schoolpro_lang_v1',
+  STUDENTS: 'schoolpro_students_v2',
+  CLASSES: 'schoolpro_classes_v2',
+  PRICING: 'schoolpro_pricing_v2',
+  TIMETABLE: 'schoolpro_timetable_v2',
+  EXAM_SCORES: 'schoolpro_exam_scores_v2',
+  ATTENDANCE: 'schoolpro_attendance_v2',
+  FEES: 'schoolpro_fees_v2',
+  LANG: 'schoolpro_lang_v2',
+  DEVELOPER: 'schoolpro_developer_profile_v2',
+  TEACHERS: 'schoolpro_teachers_v2',
+  USERS: 'schoolpro_users_v2',
+  CURRENT_USER: 'schoolpro_current_user_v2',
 };
 
 export default function App() {
@@ -50,8 +76,65 @@ export default function App() {
     });
   };
 
+  // User Accounts State (for shared login & registration)
+  const [users, setUsers] = useState<UserAccount[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.USERS);
+      return saved ? JSON.parse(saved) : INITIAL_USERS;
+    } catch {
+      return INITIAL_USERS;
+    }
+  });
+
+  // Current Logged In User State
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Teachers State
+  const [teachers, setTeachers] = useState<Teacher[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.TEACHERS);
+      return saved ? JSON.parse(saved) : INITIAL_TEACHERS;
+    } catch {
+      return INITIAL_TEACHERS;
+    }
+  });
+
   // Classes State
-  const [classes] = useState<GradeClass[]>(INITIAL_CLASSES);
+  const [classes, setClasses] = useState<GradeClass[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CLASSES);
+      return saved ? JSON.parse(saved) : INITIAL_CLASSES;
+    } catch {
+      return INITIAL_CLASSES;
+    }
+  });
+
+  // Tuition Pricing State
+  const [classPricing, setClassPricing] = useState<Record<string, ClassPricing>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.PRICING);
+      return saved ? JSON.parse(saved) : INITIAL_PRICING;
+    } catch {
+      return INITIAL_PRICING;
+    }
+  });
+
+  // Timetable State
+  const [timetableSlots, setTimetableSlots] = useState<TimetableSlot[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.TIMETABLE);
+      return saved ? JSON.parse(saved) : INITIAL_TIMETABLE;
+    } catch {
+      return INITIAL_TIMETABLE;
+    }
+  });
 
   // Students State
   const [students, setStudents] = useState<Student[]>(() => {
@@ -106,10 +189,60 @@ export default function App() {
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
 
+  // Developer Profile State
+  const [developerProfile, setDeveloperProfile] = useState<DeveloperProfile>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.DEVELOPER);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.avatarUrl?.includes('photo-1534528741775-53994a69daeb')) {
+          parsed.avatarUrl = INITIAL_DEVELOPER.avatarUrl;
+        }
+        return parsed;
+      }
+      return INITIAL_DEVELOPER;
+    } catch {
+      return INITIAL_DEVELOPER;
+    }
+  });
+  const [isDevProfileOpen, setIsDevProfileOpen] = useState(false);
+
   // Save to LocalStorage on changes
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.DEVELOPER, JSON.stringify(developerProfile));
+  }, [developerProfile]);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
   }, [students]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.TEACHERS, JSON.stringify(teachers));
+  }, [teachers]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CLASSES, JSON.stringify(classes));
+  }, [classes]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.PRICING, JSON.stringify(classPricing));
+  }, [classPricing]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.TIMETABLE, JSON.stringify(timetableSlots));
+  }, [timetableSlots]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.EXAM_SCORES, JSON.stringify(examScores));
@@ -123,16 +256,93 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.FEES, JSON.stringify(tuitionFees));
   }, [tuitionFees]);
 
+  // Auth Operations
+  const handleLogin = (user: UserAccount) => {
+    setCurrentUser(user);
+  };
+
+  const handleRegister = (newUser: UserAccount) => {
+    setUsers((prev) => [newUser, ...prev]);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+  };
+
   // Reset to initial demo data
   const handleResetData = () => {
     setStudents(INITIAL_STUDENTS);
+    setTeachers(INITIAL_TEACHERS);
+    setUsers(INITIAL_USERS);
+    setClasses(INITIAL_CLASSES);
+    setClassPricing(INITIAL_PRICING);
+    setTimetableSlots(INITIAL_TIMETABLE);
     setExamScores(INITIAL_EXAM_SCORES);
     setAttendance(INITIAL_ATTENDANCE);
     setTuitionFees(INITIAL_FEES);
     localStorage.removeItem(STORAGE_KEYS.STUDENTS);
+    localStorage.removeItem(STORAGE_KEYS.TEACHERS);
+    localStorage.removeItem(STORAGE_KEYS.USERS);
+    localStorage.removeItem(STORAGE_KEYS.CLASSES);
+    localStorage.removeItem(STORAGE_KEYS.PRICING);
+    localStorage.removeItem(STORAGE_KEYS.TIMETABLE);
     localStorage.removeItem(STORAGE_KEYS.EXAM_SCORES);
     localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
     localStorage.removeItem(STORAGE_KEYS.FEES);
+  };
+
+  const handleUpdateCurrentUser = (updatedUser: UserAccount) => {
+    setCurrentUser(updatedUser);
+    setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+  };
+
+  // Teacher CRUD operations
+  const handleAddTeacher = (data: Partial<Teacher>) => {
+    const newTeacher: Teacher = {
+      id: `tch-${Date.now()}`,
+      nameKhmer: data.nameKhmer || '',
+      nameLatin: data.nameLatin || '',
+      gender: data.gender || 'male',
+      subject: data.subject || 'ភាសាខ្មែរ',
+      phone: data.phone || '',
+      email: data.email || '',
+      homeroomGradeId: data.homeroomGradeId || undefined,
+      avatarUrl:
+        data.avatarUrl ||
+        'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&auto=format&fit=crop&q=80',
+      qualification: data.qualification || 'បរិញ្ញាបត្រគរុកោសល្យ',
+      bio: data.bio || '',
+      joinDate: data.joinDate || new Date().toISOString().slice(0, 10),
+      status: data.status || 'active',
+    };
+    setTeachers((prev) => [newTeacher, ...prev]);
+  };
+
+  const handleUpdateTeacher = (updated: Teacher) => {
+    setTeachers((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+
+    // Synchronize with currentUser and users list if this is the logged-in teacher
+    if (
+      currentUser &&
+      (currentUser.teacherId === updated.id ||
+        (currentUser.email && updated.email && currentUser.email.toLowerCase() === updated.email.toLowerCase()) ||
+        (currentUser.role === 'teacher' && currentUser.name === updated.nameKhmer))
+    ) {
+      const updatedUser: UserAccount = {
+        ...currentUser,
+        name: updated.nameKhmer,
+        avatarUrl: updated.avatarUrl || currentUser.avatarUrl,
+        phone: updated.phone || currentUser.phone,
+        email: updated.email || currentUser.email,
+        teacherId: updated.id,
+      };
+      setCurrentUser(updatedUser);
+      setUsers((prev) => prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)));
+    }
+  };
+
+  const handleDeleteTeacher = (teacherId: string) => {
+    setTeachers((prev) => prev.filter((t) => t.id !== teacherId));
   };
 
   // Student CRUD operations
@@ -152,7 +362,7 @@ export default function App() {
         gender: data.gender || 'male',
         dob: data.dob || '2012-01-01',
         pob: data.pob || 'ភ្នំពេញ',
-        gradeId: data.gradeId || '7A',
+        gradeId: data.gradeId || classes[0]?.id || '7A',
         phone: data.phone || '',
         address: data.address || '',
         status: data.status || 'active',
@@ -162,6 +372,13 @@ export default function App() {
         parentRelationship: data.parentRelationship || 'ឪពុក',
         parentOccupation: data.parentOccupation || '',
         emergencyContact: data.emergencyContact || '',
+        bloodType: data.bloodType || 'O+',
+        heightCm: data.heightCm || 155,
+        weightKg: data.weightKg || 48,
+        allergies: data.allergies || '',
+        chronicCondition: data.chronicCondition || '',
+        merits: data.merits || [],
+        warnings: data.warnings || [],
         notes: data.notes || '',
         avatarUrl:
           data.gender === 'female'
@@ -179,6 +396,43 @@ export default function App() {
 
   const handleImportStudents = (imported: Student[]) => {
     setStudents((prev) => [...imported, ...prev]);
+  };
+
+  // Class CRUD
+  const handleAddClass = (newClass: GradeClass) => {
+    setClasses((prev) => [...prev, newClass]);
+    // Set default pricing
+    setClassPricing((prev) => ({
+      ...prev,
+      [newClass.id]: { gradeId: newClass.id, monthlyFee: 130, currency: 'USD', registrationFee: 20, materialFee: 30 },
+    }));
+  };
+
+  const handleUpdateClass = (updatedClass: GradeClass) => {
+    setClasses((prev) => prev.map((c) => (c.id === updatedClass.id ? updatedClass : c)));
+  };
+
+  const handleDeleteClass = (classId: string) => {
+    setClasses((prev) => prev.filter((c) => c.id !== classId));
+  };
+
+  // Timetable Operations
+  const handleSaveSlot = (slot: TimetableSlot) => {
+    setTimetableSlots((prev) => {
+      const idx = prev.findIndex(
+        (s) => s.gradeId === slot.gradeId && s.dayOfWeek === slot.dayOfWeek && s.timeSlot === slot.timeSlot
+      );
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = slot;
+        return copy;
+      }
+      return [...prev, slot];
+    });
+  };
+
+  const handleDeleteSlot = (slotId: string) => {
+    setTimetableSlots((prev) => prev.filter((s) => s.id !== slotId));
   };
 
   // Attendance update
@@ -213,6 +467,18 @@ export default function App() {
     setTuitionFees((prev) => prev.map((f) => (f.id === fee.id ? fee : f)));
   };
 
+  const handleDeleteFee = (feeId: string) => {
+    setTuitionFees((prev) => prev.filter((f) => f.id !== feeId));
+  };
+
+  const handleUpdatePricing = (pricing: Record<string, ClassPricing>) => {
+    setClassPricing(pricing);
+  };
+
+  const handleBatchGenerateFees = (newFees: TuitionFee[]) => {
+    setTuitionFees((prev) => [...newFees, ...prev]);
+  };
+
   // Navigations
   const handleOpenReportCard = (studentId: string) => {
     setReportCardStudentId(studentId);
@@ -225,6 +491,19 @@ export default function App() {
       setSelectedProfileStudent(s);
     }
   };
+
+  // If not logged in, show Auth Gate (Login / Register screen)
+  if (!currentUser) {
+    return (
+      <AuthView
+        users={users}
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        classes={classes}
+        lang={lang}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 text-slate-800">
@@ -239,6 +518,10 @@ export default function App() {
         onResetData={handleResetData}
         onSelectStudent={handleSelectStudentForProfile}
         activeTab={currentTab}
+        onOpenDeveloperProfile={() => setIsDevProfileOpen(true)}
+        developerAvatar={developerProfile.avatarUrl}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main Body */}
@@ -249,6 +532,10 @@ export default function App() {
           onChangeTab={setCurrentTab}
           lang={lang}
           studentCount={students.length}
+          teacherCount={teachers.length}
+          currentUser={currentUser}
+          onLogout={handleLogout}
+          onOpenDeveloperProfile={() => setIsDevProfileOpen(true)}
         />
 
         {/* Dynamic Main Workspace View */}
@@ -260,6 +547,7 @@ export default function App() {
               examScores={examScores}
               attendance={attendance}
               tuitionFees={tuitionFees}
+              teachers={teachers}
               lang={lang}
               onNavigate={setCurrentTab}
               onSelectStudent={handleSelectStudentForProfile}
@@ -283,6 +571,20 @@ export default function App() {
               onViewStudent={setSelectedProfileStudent}
               onViewReportCard={handleOpenReportCard}
               onImportStudents={handleImportStudents}
+            />
+          )}
+
+          {currentTab === 'teachers' && (
+            <TeacherManagementView
+              teachers={teachers}
+              classes={classes}
+              timetableSlots={timetableSlots}
+              currentUser={currentUser}
+              onAddTeacher={handleAddTeacher}
+              onUpdateTeacher={handleUpdateTeacher}
+              onDeleteTeacher={handleDeleteTeacher}
+              onUpdateCurrentUser={handleUpdateCurrentUser}
+              lang={lang}
             />
           )}
 
@@ -321,22 +623,37 @@ export default function App() {
           {currentTab === 'tuition' && (
             <TuitionView
               students={students}
+              classes={classes}
               tuitionFees={tuitionFees}
+              classPricing={classPricing}
               onAddFee={handleAddFee}
               onUpdateFee={handleUpdateFee}
+              onDeleteFee={handleDeleteFee}
+              onUpdatePricing={handleUpdatePricing}
+              onBatchGenerateFees={handleBatchGenerateFees}
               lang={lang}
             />
           )}
 
           {currentTab === 'timetable' && (
-            <TimetableView classes={classes} lang={lang} />
+            <TimetableView
+              classes={classes}
+              timetableSlots={timetableSlots}
+              onSaveSlot={handleSaveSlot}
+              onDeleteSlot={handleDeleteSlot}
+              lang={lang}
+            />
           )}
 
           {currentTab === 'settings' && (
             <SchoolSettingsView
               classes={classes}
+              onAddClass={handleAddClass}
+              onUpdateClass={handleUpdateClass}
+              onDeleteClass={handleDeleteClass}
               onResetData={handleResetData}
               lang={lang}
+              onOpenDeveloperProfile={() => setIsDevProfileOpen(true)}
             />
           )}
         </main>
@@ -371,6 +688,15 @@ export default function App() {
           setIsStudentModalOpen(true);
         }}
         onViewReportCard={handleOpenReportCard}
+        lang={lang}
+      />
+
+      {/* Developer Profile Modal (ប្រវត្តិរូបអ្នកបង្កើតកម្មវិធី) */}
+      <DeveloperProfileModal
+        isOpen={isDevProfileOpen}
+        onClose={() => setIsDevProfileOpen(false)}
+        developer={developerProfile}
+        onSaveProfile={(updated) => setDeveloperProfile(updated)}
         lang={lang}
       />
     </div>

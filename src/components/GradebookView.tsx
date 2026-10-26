@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   AlertCircle,
   HelpCircle,
+  Printer,
 } from 'lucide-react';
 import { Student, GradeClass, ExamTermScore, Subject } from '../types';
 import { Language, translations } from '../utils/i18n';
@@ -16,6 +17,7 @@ import {
   calculateClassRanks,
   determineGradeLetter,
 } from '../utils/academic';
+import { GradeResultsPrintModal } from './GradeResultsPrintModal';
 
 interface GradebookViewProps {
   students: Student[];
@@ -39,11 +41,16 @@ export const GradebookView: React.FC<GradebookViewProps> = ({
   const [selectedGrade, setSelectedGrade] = useState<string>(classes[0]?.id || '7A');
   const [selectedTerm, setSelectedTerm] = useState<string>('ឆមាសទី ១ (២០២៤-២០២៥)');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   // Filter students by selected grade
   const gradeStudents = useMemo(() => {
     return students.filter((s) => s.gradeId === selectedGrade && s.status === 'active');
   }, [students, selectedGrade]);
+
+  const currentClass = useMemo(() => {
+    return classes.find((c) => c.id === selectedGrade);
+  }, [classes, selectedGrade]);
 
   // Working scores map: studentId -> ExamTermScore
   const [localScores, setLocalScores] = useState<Record<string, ExamTermScore>>({});
@@ -229,6 +236,16 @@ export const GradebookView: React.FC<GradebookViewProps> = ({
             <span className="hidden sm:inline">{t.exportCSV}</span>
           </button>
 
+          {/* Print Results Button */}
+          <button
+            onClick={() => setIsPrintModalOpen(true)}
+            className="px-3.5 py-1.5 text-xs sm:text-sm font-semibold text-slate-800 bg-amber-100 hover:bg-amber-200 border border-amber-300/80 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title={lang === 'km' ? 'បោះពុម្ពតារាងលទ្ធផល' : 'Print Results Summary'}
+          >
+            <Printer className="w-4 h-4 text-amber-700" />
+            <span>{lang === 'km' ? 'បោះពុម្ពលទ្ធផល' : 'Print Results'}</span>
+          </button>
+
           {/* Save Button */}
           <button
             onClick={handleSave}
@@ -398,6 +415,17 @@ export const GradebookView: React.FC<GradebookViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Official Results Print Modal */}
+      <GradeResultsPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={() => setIsPrintModalOpen(false)}
+        currentClass={currentClass}
+        students={students}
+        term={selectedTerm}
+        rankedScores={computedRankedList}
+        lang={lang}
+      />
     </div>
   );
 };

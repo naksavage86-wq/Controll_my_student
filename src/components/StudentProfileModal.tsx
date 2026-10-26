@@ -221,6 +221,84 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Health & Discipline Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Health & Medical Profile */}
+            <div className="bg-emerald-50/30 p-4 rounded-xl border border-emerald-200/60 space-y-3">
+              <h4 className="text-xs font-bold text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🩺 {lang === 'km' ? 'សុខភាព & កាយសម្បទា' : 'Health & Biometrics'}</span>
+              </h4>
+              <div className="space-y-2 text-xs sm:text-sm">
+                <div className="flex justify-between py-1 border-b border-emerald-100">
+                  <span className="text-slate-600">{lang === 'km' ? 'ក្រុមឈាម' : 'Blood Type'}:</span>
+                  <span className="font-bold text-emerald-800 font-mono bg-emerald-100 px-2 py-0.5 rounded">
+                    {student.bloodType || 'O+'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-emerald-100">
+                  <span className="text-slate-600">{lang === 'km' ? 'កម្ពស់ & ទម្ងន់' : 'Height & Weight'}:</span>
+                  <span className="font-medium text-slate-900 font-mono">
+                    {student.heightCm ? `${student.heightCm} cm` : '158 cm'} / {student.weightKg ? `${student.weightKg} kg` : '49 kg'}
+                  </span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-emerald-100">
+                  <span className="text-slate-600">{lang === 'km' ? 'អាឡែកហ្ស៊ី' : 'Allergies'}:</span>
+                  <span className="font-medium text-slate-800">{student.allergies || (lang === 'km' ? 'គ្មាន' : 'None')}</span>
+                </div>
+                <div className="py-1">
+                  <span className="text-slate-600 block mb-0.5">{lang === 'km' ? 'ជំងឺប្រចាំកាយ' : 'Chronic Condition'}:</span>
+                  <span className="font-medium text-slate-800 text-xs">{student.chronicCondition || (lang === 'km' ? 'សុខភាពល្អធម្មតា' : 'Healthy / None')}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Discipline & Merits */}
+            <div className="bg-indigo-50/30 p-4 rounded-xl border border-indigo-200/60 space-y-3">
+              <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span>🎖️ {lang === 'km' ? 'ស្នាដៃកិត្តិយស & វិន័យ' : 'Merits & Discipline'}</span>
+              </h4>
+              <div className="space-y-2.5 text-xs sm:text-sm">
+                <div>
+                  <span className="text-slate-600 font-medium block mb-1">
+                    {lang === 'km' ? 'ស្នាដៃ និងលិខិតសរសើរ' : 'Honors & Merits'}:
+                  </span>
+                  {student.merits && student.merits.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {student.merits.map((m, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 font-semibold text-xs">
+                          ⭐ {m}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-xs">
+                      {lang === 'km' ? 'សិស្សគំរូប្រចាំថ្នាក់' : 'Exemplary student'}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-slate-600 font-medium block mb-1">
+                    {lang === 'km' ? 'កំណត់ត្រាវិន័យ' : 'Disciplinary Record'}:
+                  </span>
+                  {student.warnings && student.warnings.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {student.warnings.map((w, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded-md bg-rose-100 text-rose-800 text-xs font-semibold">
+                          ⚠️ {w}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs font-medium">
+                      ✓ {lang === 'km' ? 'មានវិន័យល្អ គ្មានកំណត់ត្រាអវិជ្ជមាន' : 'Good conduct, no infractions'}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
