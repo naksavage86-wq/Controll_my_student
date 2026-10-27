@@ -1,19 +1,29 @@
 import { Student, Subject, ExamTermScore, AttendanceStatus, DailyAttendance } from '../types';
 
 export const DEFAULT_SUBJECTS: Subject[] = [
-  { id: 'khmer', khmerName: 'ភាសាខ្មែរ', englishName: 'Khmer Literature', code: 'KHM', coefficient: 2, maxScore: 100 },
-  { id: 'math', khmerName: 'គណិតវិទ្យា', englishName: 'Mathematics', code: 'MTH', coefficient: 2, maxScore: 100 },
-  { id: 'phys', khmerName: 'រូបវិទ្យា', englishName: 'Physics', code: 'PHY', coefficient: 1, maxScore: 100 },
-  { id: 'chem', khmerName: 'គីមីវិទ្យា', englishName: 'Chemistry', code: 'CHM', coefficient: 1, maxScore: 100 },
-  { id: 'bio', khmerName: 'ជីវវិទ្យា', englishName: 'Biology', code: 'BIO', coefficient: 1, maxScore: 100 },
-  { id: 'history', khmerName: 'ប្រវត្តិវិទ្យា', englishName: 'History', code: 'HIS', coefficient: 1, maxScore: 100 },
-  { id: 'english', khmerName: 'ភាសាអង់គ្លេស', englishName: 'English', code: 'ENG', coefficient: 1, maxScore: 100 },
-  { id: 'civics', khmerName: 'សីលធម៌-ពលរដ្ឋ', englishName: 'Moral & Civics', code: 'CIV', coefficient: 1, maxScore: 100 },
-  { id: 'ict', khmerName: 'ព័ត៌មានវិទ្យា', englishName: 'ICT & Computer', code: 'ICT', coefficient: 1, maxScore: 100 },
+  { id: 'khmer', khmerName: 'ភាសាខ្មែរ', englishName: 'Khmer Literature', code: 'KHM', coefficient: 2, maxScore: 100, isActive: true },
+  { id: 'math', khmerName: 'គណិតវិទ្យា', englishName: 'Mathematics', code: 'MTH', coefficient: 2, maxScore: 100, isActive: true },
+  { id: 'phys', khmerName: 'រូបវិទ្យា', englishName: 'Physics', code: 'PHY', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'chem', khmerName: 'គីមីវិទ្យា', englishName: 'Chemistry', code: 'CHM', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'bio', khmerName: 'ជីវវិទ្យា', englishName: 'Biology', code: 'BIO', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'history', khmerName: 'ប្រវត្តិវិទ្យា', englishName: 'History', code: 'HIS', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'geo', khmerName: 'ភូមិវិទ្យា', englishName: 'Geography', code: 'GEO', coefficient: 1, maxScore: 100, isActive: false },
+  { id: 'earth', khmerName: 'ផែនដីវិទ្យា', englishName: 'Earth Science', code: 'EAR', coefficient: 1, maxScore: 100, isActive: false },
+  { id: 'civics', khmerName: 'សីលធម៌-ពលរដ្ឋ', englishName: 'Moral & Civics', code: 'CIV', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'english', khmerName: 'ភាសាអង់គ្លេស', englishName: 'English', code: 'ENG', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'ict', khmerName: 'ព័ត៌មានវិទ្យា', englishName: 'ICT & Computer', code: 'ICT', coefficient: 1, maxScore: 100, isActive: true },
+  { id: 'pe', khmerName: 'អប់រំកាយ-កីឡា', englishName: 'Physical Education', code: 'PE', coefficient: 1, maxScore: 100, isActive: false },
 ];
 
 /**
- * Calculates weighted total score for a student
+ * Filter only active subjects that are taught in the class
+ */
+export function getActiveSubjects(subjects: Subject[] = DEFAULT_SUBJECTS): Subject[] {
+  return subjects.filter((s) => s.isActive !== false);
+}
+
+/**
+ * Calculates weighted total score for a student for active subjects
  */
 export function calculateStudentTotal(
   scores: Record<string, number>,
@@ -21,30 +31,51 @@ export function calculateStudentTotal(
 ): number {
   let total = 0;
   for (const subject of subjects) {
+    if (subject.isActive === false) continue;
     const rawScore = scores[subject.id] ?? 0;
-    total += rawScore * subject.coefficient;
+    const coef = subject.coefficient || 1;
+    total += rawScore * coef;
   }
   return Math.round(total * 100) / 100;
 }
 
 /**
- * Calculates weighted average out of 100
+ * Calculates maximum possible weighted total score for given active subjects
+ */
+export function calculateMaxPossibleTotal(
+  subjects: Subject[] = DEFAULT_SUBJECTS
+): number {
+  let maxTotal = 0;
+  for (const subject of subjects) {
+    if (subject.isActive === false) continue;
+    const maxScore = subject.maxScore || 100;
+    const coef = subject.coefficient || 1;
+    maxTotal += maxScore * coef;
+  }
+  return Math.round(maxTotal * 100) / 100;
+}
+
+/**
+ * Calculates weighted percentage average out of 100 based on custom max score per active subject
  */
 export function calculateStudentAverage(
   scores: Record<string, number>,
   subjects: Subject[] = DEFAULT_SUBJECTS
 ): number {
   let totalWeightedScore = 0;
-  let totalCoefficients = 0;
+  let maxPossibleScore = 0;
 
   for (const subject of subjects) {
+    if (subject.isActive === false) continue;
     const rawScore = scores[subject.id] ?? 0;
-    totalWeightedScore += rawScore * subject.coefficient;
-    totalCoefficients += subject.coefficient;
+    const maxScore = subject.maxScore || 100;
+    const coef = subject.coefficient || 1;
+    totalWeightedScore += rawScore * coef;
+    maxPossibleScore += maxScore * coef;
   }
 
-  if (totalCoefficients === 0) return 0;
-  const avg = totalWeightedScore / totalCoefficients;
+  if (maxPossibleScore === 0) return 0;
+  const avg = (totalWeightedScore / maxPossibleScore) * 100;
   return Math.round(avg * 100) / 100;
 }
 

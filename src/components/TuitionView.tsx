@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   CreditCard,
   Plus,
@@ -16,11 +16,14 @@ import {
   Settings,
   Layers,
   Save,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { Student, TuitionFee, GradeClass, ClassPricing } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { formatSchoolFee } from '../utils/academic';
 import { SCHOOL_INFO, INITIAL_PRICING } from '../data/mockData';
+import { printElement, openPrintWindow } from '../utils/printHelper';
 
 interface TuitionViewProps {
   students: Student[];
@@ -58,6 +61,8 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [selectedReceipt, setSelectedReceipt] = useState<TuitionFee | null>(null);
   const [editingFee, setEditingFee] = useState<TuitionFee | null>(null);
+  const receiptPrintRef = useRef<HTMLDivElement>(null);
+  const [isPrintingReceipt, setIsPrintingReceipt] = useState(false);
 
   // New or Edit Invoice Form state
   const [feeForm, setFeeForm] = useState<Partial<TuitionFee>>({
@@ -774,19 +779,42 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
 
       {/* Printable Receipt Modal */}
       {selectedReceipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-300 overflow-hidden">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-slate-300 overflow-hidden my-6">
             <div className="no-print p-4 bg-slate-50 border-b flex items-center justify-between">
               <span className="font-bold text-slate-900 text-sm">
                 {lang === 'km' ? 'បង្កាន់ដៃបង់ប្រាក់ផ្លូវការ' : 'Official Payment Receipt'}
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => window.print()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium cursor-pointer"
+                  onClick={async () => {
+                    if (!receiptPrintRef.current) return;
+                    setIsPrintingReceipt(true);
+                    try {
+                      await printElement(receiptPrintRef.current, {
+                        title: `បង្កាន់ដៃ_${selectedReceipt.receiptNo || selectedReceipt.invoiceNo}`,
+                        orientation: 'portrait',
+                      });
+                    } finally {
+                      setIsPrintingReceipt(false);
+                    }
+                  }}
+                  disabled={isPrintingReceipt}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold cursor-pointer disabled:opacity-60 transition-colors"
                 >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>{t.print}</span>
+                  {isPrintingReceipt ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Printer className="w-3.5 h-3.5" />}
+                  <span>{isPrintingReceipt ? (lang === 'km' ? 'កំពុងរៀបចំ...' : 'Preparing...') : t.print}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    if (receiptPrintRef.current) {
+                      openPrintWindow(receiptPrintRef.current, `បង្កាន់ដៃ_${selectedReceipt.receiptNo || selectedReceipt.invoiceNo}`, 'portrait');
+                    }
+                  }}
+                  className="p-1.5 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-lg text-xs cursor-pointer"
+                  title={lang === 'km' ? 'បើកផ្ទាំងថ្មី' : 'Open in new tab'}
+                >
+                  <ExternalLink className="w-4 h-4" />
                 </button>
                 <button onClick={() => setSelectedReceipt(null)} className="p-1 text-slate-400 hover:text-slate-700">
                   <X className="w-5 h-5" />
@@ -795,7 +823,7 @@ export const TuitionView: React.FC<TuitionViewProps> = ({
             </div>
 
             {/* Receipt Sheet */}
-            <div className="p-6 text-slate-900 text-xs sm:text-sm">
+            <div ref={receiptPrintRef} id="printable-receipt" className="p-6 text-slate-900 text-xs sm:text-sm bg-white">
               <div className="text-center border-b pb-4 mb-4">
                 <h4 className="font-moul text-sm text-slate-900">{SCHOOL_INFO.nameKhmer}</h4>
                 <p className="text-[11px] text-slate-500 font-sans">{SCHOOL_INFO.nameEnglish}</p>

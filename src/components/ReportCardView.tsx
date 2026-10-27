@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Printer,
   ChevronLeft,
@@ -8,20 +8,26 @@ import {
   CheckCircle,
   FileCheck,
   User,
+  ExternalLink,
+  Download,
+  Loader2,
 } from 'lucide-react';
-import { Student, GradeClass, ExamTermScore } from '../types';
+import { Student, GradeClass, ExamTermScore, Subject } from '../types';
 import { Language, translations } from '../utils/i18n';
 import {
   DEFAULT_SUBJECTS,
   calculateClassRanks,
+  calculateMaxPossibleTotal,
   determineGradeLetter,
 } from '../utils/academic';
 import { SCHOOL_INFO } from '../data/mockData';
+import { printElement, openPrintWindow, exportAsHtmlFile } from '../utils/printHelper';
 
 interface ReportCardViewProps {
   students: Student[];
   classes: GradeClass[];
   examScores: ExamTermScore[];
+  classSubjectsMap?: Record<string, Subject[]>;
   selectedStudentId?: string;
   onBack: () => void;
   lang: Language;
@@ -31,6 +37,7 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
   students,
   classes,
   examScores,
+  classSubjectsMap,
   selectedStudentId,
   onBack,
   lang,
@@ -41,20 +48,42 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
   const [currentStudentId, setCurrentStudentId] = useState<string>(
     selectedStudentId || students[0]?.id || ''
   );
+  const [selectedTerm, setSelectedTerm] = useState<string>('ឆមាសទី ១ (២០២៤-២០២៥)');
 
   const student = students.find((s) => s.id === currentStudentId) || students[0];
   const gradeClass = classes.find((c) => c.id === student?.gradeId);
 
+  // Dynamic subjects for student's class level
+  const studentSubjects: Subject[] = useMemo(() => {
+    if (!student) return DEFAULT_SUBJECTS;
+    if (classSubjectsMap && classSubjectsMap[student.gradeId]) {
+      return classSubjectsMap[student.gradeId];
+    }
+    if (classSubjectsMap && classSubjectsMap['default']) {
+      return classSubjectsMap['default'];
+    }
+    return DEFAULT_SUBJECTS;
+  }, [student, classSubjectsMap]);
+
+  // Active subjects studied in this student's class
+  const activeStudentSubjects = useMemo(() => {
+    return studentSubjects.filter((s) => s.isActive !== false);
+  }, [studentSubjects]);
+
+  // Max possible total score for current class
+  const maxPossibleTotal = useMemo(() => {
+    return calculateMaxPossibleTotal(studentSubjects);
+  }, [studentSubjects]);
+
   // Compute ranks for the class
   const classScores = useMemo(() => {
     if (!student) return [];
-    const classStudentIds = students
-      .filter((s) => s.gradeId === student.gradeId)
-      .map((s) => s.id);
-
-    const relevant = examScores.filter((e) => classStudentIds.includes(e.studentId));
-    return calculateClassRanks(relevant, DEFAULT_SUBJECTS);
-  }, [student, students, examScores]);
+    const gradeScores = examScores.filter((e) => {
+      const s = students.find((st) => st.id === e.studentId);
+      return s?.gradeId === student.gradeId && e.term === selectedTerm;
+    });
+    return calculateClassRanks(gradeScores, studentSubjects);
+  }, [examScores, students, student, selectedTerm, studentSubjects]);
 
   const studentExam = classScores.find((e) => e.studentId === student?.id);
   const evaluation = determineGradeLetter(studentExam?.averageScore ?? 0);
@@ -72,14 +101,38 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
     }
   };
 
+  const reportCardRef = useRef<HTMLDivElement>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+
   const handleNext = () => {
     if (currentIndex < classStudents.length - 1) {
       setCurrentStudentId(classStudents[currentIndex + 1].id);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
+  const cardTitle = `ព្រឹត្តិបត្រពិន្ទុ_${student?.khmerName || 'សិស្ស'}_${student?.gradeId || ''}`;
+
+  const handlePrint = async () => {
+    if (!reportCardRef.current) return;
+    setIsPrinting(true);
+    try {
+      await printElement(reportCardRef.current, {
+        title: cardTitle,
+        orientation: 'portrait',
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleOpenCleanWindow = () => {
+    if (!reportCardRef.current) return;
+    openPrintWindow(reportCardRef.current, cardTitle, 'portrait');
+  };
+
+  const handleExportHtml = () => {
+    if (!reportCardRef.current) return;
+    exportAsHtmlFile(reportCardRef.current, `${cardTitle}.html`, 'portrait');
   };
 
   if (!student) {
@@ -151,16 +204,35 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
           {/* Print Button */}
           <button
             onClick={handlePrint}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer"
+            disabled={isPrinting}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-60"
           >
-            <Printer className="w-4 h-4" />
-            <span>{t.print}</span>
+            {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+            <span>{isPrinting ? (lang === 'km' ? 'កំពុងរៀបចំ...' : 'Preparing...') : t.print}</span>
+          </button>
+
+          <button
+            onClick={handleOpenCleanWindow}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+            title={lang === 'km' ? 'បើកផ្ទាំងដាច់ដោយឡែក' : 'Open in separate tab'}
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{lang === 'km' ? 'បើកផ្ទាំងថ្មី' : 'New Tab'}</span>
+          </button>
+
+          <button
+            onClick={handleExportHtml}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+            title={lang === 'km' ? 'ទាញយក HTML' : 'Download HTML'}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{lang === 'km' ? 'ទាញយក HTML' : 'Download'}</span>
           </button>
         </div>
       </div>
 
       {/* Official Khmer Report Card Document Sheet (Paper container) */}
-      <div className="max-w-[850px] mx-auto bg-white p-8 sm:p-12 rounded-2xl border border-slate-300 shadow-md print:shadow-none print:border-none print:p-0 print:m-0 text-slate-900">
+      <div ref={reportCardRef} id="printable-report-card" className="max-w-[850px] mx-auto bg-white p-8 sm:p-12 rounded-2xl border border-slate-300 shadow-md print:shadow-none print:border-none print:p-0 print:m-0 text-slate-900">
         {/* National Header */}
         <div className="flex justify-between items-start border-b-2 border-slate-900 pb-5 mb-6">
           {/* Left School Info */}
@@ -251,10 +323,10 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
               </tr>
             </thead>
             <tbody>
-              {DEFAULT_SUBJECTS.map((sub, i) => {
+              {activeStudentSubjects.map((sub, i) => {
                 const rawScore = studentExam?.scores[sub.id] ?? 0;
                 const weighted = rawScore * sub.coefficient;
-                const subEval = determineGradeLetter(rawScore);
+                const subEval = determineGradeLetter((rawScore / (sub.maxScore || 100)) * 100);
 
                 return (
                   <tr key={sub.id} className="border-b border-slate-200">
@@ -266,8 +338,8 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
                     <td className="border border-slate-300 p-2 text-center font-mono font-medium">
                       {sub.coefficient}
                     </td>
-                    <td className="border border-slate-300 p-2 text-center font-mono text-slate-600">
-                      {sub.maxScore}
+                    <td className="border border-slate-300 p-2 text-center font-mono font-bold text-blue-800 bg-blue-50/30">
+                      {sub.maxScore || 100}
                     </td>
                     <td className="border border-slate-300 p-2 text-center font-mono font-bold text-slate-900">
                       {rawScore}
@@ -294,7 +366,7 @@ export const ReportCardView: React.FC<ReportCardViewProps> = ({
             <div className="flex justify-between">
               <span className="text-slate-600 font-medium">{t.totalScore}:</span>
               <span className="font-bold font-mono text-slate-900">
-                {studentExam?.totalScore ?? 0} <span className="text-xs text-slate-500 font-normal">/ 1100</span>
+                {studentExam?.totalScore ?? 0} <span className="text-xs text-slate-500 font-normal">/ {maxPossibleTotal}</span>
               </span>
             </div>
             <div className="flex justify-between">

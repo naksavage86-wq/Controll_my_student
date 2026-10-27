@@ -1,9 +1,10 @@
-import React from 'react';
-import { X, Printer, Award, FileSpreadsheet, Download, CheckCircle, XCircle } from 'lucide-react';
-import { Student, GradeClass, ExamTermScore } from '../types';
+import React, { useRef, useState } from 'react';
+import { X, Printer, Award, FileSpreadsheet, Download, CheckCircle, XCircle, ExternalLink, Loader2 } from 'lucide-react';
+import { Student, GradeClass, ExamTermScore, Subject } from '../types';
 import { Language } from '../utils/i18n';
-import { DEFAULT_SUBJECTS } from '../utils/academic';
+import { DEFAULT_SUBJECTS, calculateMaxPossibleTotal } from '../utils/academic';
 import { SCHOOL_INFO } from '../data/mockData';
+import { printElement, openPrintWindow, exportAsHtmlFile } from '../utils/printHelper';
 
 interface GradeResultsPrintModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface GradeResultsPrintModalProps {
   students: Student[];
   term: string;
   rankedScores: ExamTermScore[];
+  subjects?: Subject[];
   lang: Language;
 }
 
@@ -22,9 +24,16 @@ export const GradeResultsPrintModal: React.FC<GradeResultsPrintModalProps> = ({
   students,
   term,
   rankedScores,
+  subjects = DEFAULT_SUBJECTS,
   lang,
 }) => {
+  const printAreaRef = useRef<HTMLDivElement>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+
   if (!isOpen) return null;
+
+  const activeSubjects = subjects.filter((s) => s.isActive !== false);
+  const maxPossibleTotal = calculateMaxPossibleTotal(activeSubjects);
 
   // Student mapping
   const studentMap = new Map<string, Student>();
@@ -42,33 +51,80 @@ export const GradeResultsPrintModal: React.FC<GradeResultsPrintModalProps> = ({
       ? (rankedScores.reduce((acc, curr) => acc + (curr.averageScore ?? 0), 0) / rankedScores.length).toFixed(2)
       : '0';
 
-  const handlePrint = () => {
-    window.print();
+  const docTitle = `តារាងលទ្ធផល_${currentClass?.name || 'ថ្នាក់'}_${term}`;
+
+  const handlePrint = async () => {
+    if (!printAreaRef.current) return;
+    setIsPrinting(true);
+    try {
+      await printElement(printAreaRef.current, {
+        title: docTitle,
+        orientation: 'landscape',
+      });
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleOpenCleanWindow = () => {
+    if (!printAreaRef.current) return;
+    openPrintWindow(printAreaRef.current, docTitle, 'landscape');
+  };
+
+  const handleExportHtml = () => {
+    if (!printAreaRef.current) return;
+    exportAsHtmlFile(printAreaRef.current, `${docTitle}.html`, 'landscape');
   };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto print:p-0 print:bg-white print:fixed print:inset-0">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden print:max-h-none print:shadow-none print:border-none print:w-full print:rounded-none">
         {/* Modal Top Actions (Hidden when printing) */}
-        <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-50 no-print">
+        <div className="flex flex-wrap items-center justify-between p-4 border-b border-slate-200 bg-slate-50 gap-2 no-print">
           <div className="flex items-center gap-2">
             <Award className="w-5 h-5 text-blue-600" />
-            <h3 className="font-bold text-slate-800 text-sm sm:text-base">
-              {lang === 'km' ? 'ទិដ្ឋភាពបោះពុម្ពតារាងលទ្ធផលប្រឡង' : 'Exam Results Print Preview'}
-            </h3>
+            <div>
+              <h3 className="font-bold text-slate-800 text-sm sm:text-base leading-tight">
+                {lang === 'km' ? 'ទិដ្ឋភាពបោះពុម្ពតារាងលទ្ធផលប្រឡង' : 'Exam Results Print Preview'}
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                {lang === 'km' ? 'ទម្រង់ផ្ដេក A4 (Landscape) ស្របតាមក្រសួងអប់រំ' : 'Official Ministry format in A4 Landscape'}
+              </p>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer"
+              disabled={isPrinting}
+              className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-semibold shadow-xs transition-all cursor-pointer disabled:opacity-60"
+              title="បោះពុម្ពភ្លាមៗ"
             >
-              <Printer className="w-4 h-4" />
-              <span>{lang === 'km' ? 'បោះពុម្ព (Print Now)' : 'Print Now'}</span>
+              {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+              <span>{isPrinting ? (lang === 'km' ? 'កំពុងរៀបចំ...' : 'Preparing...') : (lang === 'km' ? 'បោះពុម្ព (Print Now)' : 'Print Now')}</span>
             </button>
+
+            <button
+              onClick={handleOpenCleanWindow}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+              title={lang === 'km' ? 'បើកផ្ទាំងដាច់ដោយឡែក' : 'Open in separate tab'}
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{lang === 'km' ? 'បើកផ្ទាំងថ្មី' : 'New Tab'}</span>
+            </button>
+
+            <button
+              onClick={handleExportHtml}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-colors cursor-pointer"
+              title={lang === 'km' ? 'ទាញយកទុកជាឯកសារ HTML' : 'Download HTML'}
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">{lang === 'km' ? 'ទាញយក HTML' : 'Download'}</span>
+            </button>
+
             <button
               onClick={onClose}
-              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              className="p-2 text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer ml-1"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
@@ -77,7 +133,7 @@ export const GradeResultsPrintModal: React.FC<GradeResultsPrintModalProps> = ({
         </div>
 
         {/* Printable Document Body */}
-        <div className="p-6 sm:p-8 overflow-y-auto print:p-4 print:overflow-visible text-slate-900 font-sans">
+        <div ref={printAreaRef} id="printable-exam-results" className="p-6 sm:p-8 overflow-y-auto print:p-4 print:overflow-visible text-slate-900 font-sans">
           {/* Official Royal Header */}
           <div className="text-center mb-6">
             <div className="text-base sm:text-lg font-bold tracking-wider text-slate-900 mb-0.5">
@@ -127,13 +183,17 @@ export const GradeResultsPrintModal: React.FC<GradeResultsPrintModalProps> = ({
                   <th className="border border-slate-300 py-2 px-1 w-12">ចំណាត់ថ្នាក់</th>
                   <th className="border border-slate-300 py-2 px-2 text-left">គោត្តនាម និងនាម</th>
                   <th className="border border-slate-300 py-2 px-1 w-12">ភេទ</th>
-                  {DEFAULT_SUBJECTS.map((sub) => (
-                    <th key={sub.id} className="border border-slate-300 py-1 px-1 min-w-[36px]">
-                      <div className="truncate max-w-[50px]">{sub.khmerName}</div>
-                      <div className="text-[9px] text-slate-500 font-normal">x{sub.coefficient}</div>
+                  {activeSubjects.map((sub) => (
+                    <th key={sub.id} className="border border-slate-300 py-1 px-1 min-w-[42px]">
+                      <div className="truncate max-w-[56px]">{sub.khmerName}</div>
+                      <div className="text-[9px] text-blue-800 font-mono font-semibold">/{sub.maxScore || 100}</div>
+                      <div className="text-[8px] text-slate-500 font-normal">x{sub.coefficient}</div>
                     </th>
                   ))}
-                  <th className="border border-slate-300 py-2 px-1 w-14 bg-blue-50/50">សរុប</th>
+                  <th className="border border-slate-300 py-2 px-1 w-16 bg-blue-50/50">
+                    <div>សរុប</div>
+                    <div className="text-[9px] text-blue-900 font-normal">/{maxPossibleTotal}</div>
+                  </th>
                   <th className="border border-slate-300 py-2 px-1 w-14 bg-blue-50/50">មធ្យមភាគ</th>
                   <th className="border border-slate-300 py-2 px-1 w-12">និទ្ទេស</th>
                   <th className="border border-slate-300 py-2 px-1 w-14">អាកប្បកិរិយា</th>
@@ -163,13 +223,14 @@ export const GradeResultsPrintModal: React.FC<GradeResultsPrintModalProps> = ({
                       <td className="border border-slate-300 py-1.5 px-1">
                         {student?.gender === 'female' ? 'ស្រី' : 'ប្រុស'}
                       </td>
-                      {DEFAULT_SUBJECTS.map((sub) => {
+                      {activeSubjects.map((sub) => {
                         const s = score.scores[sub.id] ?? 0;
+                        const maxVal = sub.maxScore || 100;
                         return (
                           <td
                             key={sub.id}
                             className={`border border-slate-300 py-1.5 px-1 font-mono ${
-                              s < 50 ? 'text-rose-600 font-bold' : 'text-slate-800'
+                              s < maxVal * 0.5 ? 'text-rose-600 font-bold' : 'text-slate-800'
                             }`}
                           >
                             {s}

@@ -1,7 +1,8 @@
-import React from 'react';
-import { X, User, Phone, Mail, BookOpen, GraduationCap, School, Calendar, Printer, Edit2 } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { X, User, Phone, Mail, BookOpen, GraduationCap, School, Calendar, Printer, Edit2, Loader2 } from 'lucide-react';
 import { Teacher, GradeClass, TimetableSlot } from '../types';
 import { Language } from '../utils/i18n';
+import { printElement } from '../utils/printHelper';
 
 interface TeacherProfileModalProps {
   teacher: Teacher | null;
@@ -22,6 +23,9 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   onEdit,
   lang,
 }) => {
+  const teacherPrintRef = useRef<HTMLDivElement>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+
   if (!isOpen || !teacher) return null;
 
   const isKhmer = lang === 'km';
@@ -36,13 +40,22 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     );
   });
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    if (!teacherPrintRef.current) return;
+    setIsPrinting(true);
+    try {
+      await printElement(teacherPrintRef.current, {
+        title: `ប្រវត្តិរូបគ្រូ_${teacher.nameKhmer}`,
+        orientation: 'portrait',
+      });
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
+      <div ref={teacherPrintRef} id="printable-teacher-profile" className="bg-white rounded-2xl shadow-2xl border border-slate-200/80 w-full max-w-2xl overflow-hidden my-8 animate-in fade-in zoom-in-95 duration-200">
         {/* Modal Header */}
         <div className="relative bg-gradient-to-r from-blue-800 via-indigo-800 to-sky-700 text-white p-6 sm:p-8">
           <div className="flex items-start justify-between">
@@ -88,10 +101,11 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </button>
               <button
                 onClick={handlePrint}
-                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors"
+                disabled={isPrinting}
+                className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50 cursor-pointer"
                 title={isKhmer ? 'បោះពុម្ព' : 'Print'}
               >
-                <Printer className="w-4 h-4" />
+                {isPrinting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
               </button>
               <button
                 onClick={onClose}

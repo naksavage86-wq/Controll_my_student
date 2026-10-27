@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Clock,
   Calendar,
@@ -17,10 +17,14 @@ import {
   Sunset,
   Sparkles,
   RotateCcw,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { GradeClass, TimetableSlot } from '../types';
 import { Language, translations } from '../utils/i18n';
 import { DEFAULT_SUBJECTS } from '../utils/academic';
+import { SCHOOL_INFO } from '../data/mockData';
+import { printElement, openPrintWindow } from '../utils/printHelper';
 
 export interface TimePeriod {
   id: string;
@@ -242,6 +246,22 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
     }
   };
 
+  const timetablePrintRef = useRef<HTMLDivElement>(null);
+  const [isPrintingTimetable, setIsPrintingTimetable] = useState(false);
+
+  const handlePrintTimetable = async () => {
+    if (!timetablePrintRef.current) return;
+    setIsPrintingTimetable(true);
+    try {
+      await printElement(timetablePrintRef.current, {
+        title: `កាលវិភាគ_${currentClass?.name || 'ថ្នាក់'}`,
+        orientation: 'landscape',
+      });
+    } finally {
+      setIsPrintingTimetable(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Top Header & Actions */}
@@ -306,12 +326,25 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
 
           {/* Print button */}
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-colors cursor-pointer"
-            title="Print Timetable"
+            onClick={handlePrintTimetable}
+            disabled={isPrintingTimetable}
+            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs sm:text-sm font-medium transition-colors cursor-pointer disabled:opacity-60"
+            title="បោះពុម្ពកាលវិភាគ"
           >
-            <Printer className="w-4 h-4" />
-            <span className="hidden sm:inline">{t.print}</span>
+            {isPrintingTimetable ? <Loader2 className="w-4 h-4 animate-spin" /> : <Printer className="w-4 h-4" />}
+            <span className="hidden sm:inline">{isPrintingTimetable ? (lang === 'km' ? 'កំពុងរៀបចំ...' : 'Preparing...') : t.print}</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (timetablePrintRef.current) {
+                openPrintWindow(timetablePrintRef.current, `កាលវិភាគ_${currentClass?.name || 'ថ្នាក់'}`, 'landscape');
+              }
+            }}
+            className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl text-xs cursor-pointer"
+            title={lang === 'km' ? 'បើកផ្ទាំងថ្មី' : 'Open in new tab'}
+          >
+            <ExternalLink className="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -375,20 +408,32 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
         </div>
       </div>
 
-      {/* Class Meta Box */}
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm text-slate-800">
-        <div className="flex items-center gap-2">
-          <BookOpen className="w-4 h-4 text-blue-600" />
-          <span className="font-bold text-slate-900">{currentClass?.name}</span>
-          <span className="text-slate-400">•</span>
-          <span className="text-slate-600">{currentClass?.room}</span>
+      {/* Printable Timetable Document Area */}
+      <div ref={timetablePrintRef} id="printable-timetable" className="space-y-4">
+        {/* Printable Official School Header (visible on print or export) */}
+        <div className="hidden print-only text-center border-b pb-3 mb-2">
+          <div className="font-moul text-sm text-slate-900">{SCHOOL_INFO.nameKhmer}</div>
+          <div className="text-[11px] text-slate-600 font-sans">{SCHOOL_INFO.nameEnglish}</div>
+          <h3 className="font-bold text-base text-blue-900 mt-1">កាលវិភាគសិក្សាប្រចាំសប្តាហ៍ (CLASS TIMETABLE)</h3>
+          <div className="text-xs text-slate-700 mt-0.5">
+            ថ្នាក់ទី៖ <strong>{currentClass?.name}</strong> • បន្ទប់៖ <strong>{currentClass?.room}</strong> • គ្រូបន្ទុកថ្នាក់៖ <strong>{currentClass?.homeroomTeacher}</strong>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <User className="w-4 h-4 text-indigo-600" />
-          <span className="text-slate-600">{lang === 'km' ? 'គ្រូបន្ទុកថ្នាក់' : 'Homeroom Teacher'}:</span>
-          <span className="font-semibold text-slate-900">{currentClass?.homeroomTeacher}</span>
+
+        {/* Class Meta Box */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 p-4 rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs sm:text-sm text-slate-800">
+          <div className="flex items-center gap-2">
+            <BookOpen className="w-4 h-4 text-blue-600" />
+            <span className="font-bold text-slate-900">{currentClass?.name}</span>
+            <span className="text-slate-400">•</span>
+            <span className="text-slate-600">{currentClass?.room}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <User className="w-4 h-4 text-indigo-600" />
+            <span className="text-slate-600">{lang === 'km' ? 'គ្រូបន្ទុកថ្នាក់' : 'Homeroom Teacher'}:</span>
+            <span className="font-semibold text-slate-900">{currentClass?.homeroomTeacher}</span>
+          </div>
         </div>
-      </div>
 
       {/* Weekly Schedule Matrix */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -511,6 +556,7 @@ export const TimetableView: React.FC<TimetableViewProps> = ({
           </table>
         </div>
       </div>
+    </div>
 
       {/* Edit / Add Slot Modal */}
       {isSlotModalOpen && editingSlot && (

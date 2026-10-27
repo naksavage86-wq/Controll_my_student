@@ -31,6 +31,7 @@ import {
   DeveloperProfile,
   Teacher,
   UserAccount,
+  Subject,
 } from './types';
 import { Language } from './utils/i18n';
 import {
@@ -59,6 +60,7 @@ const STORAGE_KEYS = {
   TEACHERS: 'schoolpro_teachers_v2',
   USERS: 'schoolpro_users_v2',
   CURRENT_USER: 'schoolpro_current_user_v2',
+  CLASS_SUBJECTS: 'schoolpro_class_subjects_v2',
 };
 
 export default function App() {
@@ -176,6 +178,16 @@ export default function App() {
     }
   });
 
+  // Customized Subjects and Max Scores per Class level
+  const [classSubjectsMap, setClassSubjectsMap] = useState<Record<string, Subject[]>>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.CLASS_SUBJECTS);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   // Active Tab
   const [currentTab, setCurrentTab] = useState<TabType>('dashboard');
 
@@ -256,6 +268,10 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.FEES, JSON.stringify(tuitionFees));
   }, [tuitionFees]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.CLASS_SUBJECTS, JSON.stringify(classSubjectsMap));
+  }, [classSubjectsMap]);
+
   // Auth Operations
   const handleLogin = (user: UserAccount) => {
     setCurrentUser(user);
@@ -280,6 +296,7 @@ export default function App() {
     setExamScores(INITIAL_EXAM_SCORES);
     setAttendance(INITIAL_ATTENDANCE);
     setTuitionFees(INITIAL_FEES);
+    setClassSubjectsMap({});
     localStorage.removeItem(STORAGE_KEYS.STUDENTS);
     localStorage.removeItem(STORAGE_KEYS.TEACHERS);
     localStorage.removeItem(STORAGE_KEYS.USERS);
@@ -289,6 +306,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEYS.EXAM_SCORES);
     localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
     localStorage.removeItem(STORAGE_KEYS.FEES);
+    localStorage.removeItem(STORAGE_KEYS.CLASS_SUBJECTS);
   };
 
   const handleUpdateCurrentUser = (updatedUser: UserAccount) => {
@@ -458,6 +476,30 @@ export default function App() {
     });
   };
 
+  // Subject max scores & coefficients configuration
+  const handleUpdateClassSubjects = (
+    gradeId: string,
+    updatedSubjects: Subject[],
+    applyToAll: boolean
+  ) => {
+    setClassSubjectsMap((prev) => {
+      if (applyToAll) {
+        const next: Record<string, Subject[]> = {
+          ...prev,
+          default: updatedSubjects,
+        };
+        classes.forEach((c) => {
+          next[c.id] = updatedSubjects;
+        });
+        return next;
+      }
+      return {
+        ...prev,
+        [gradeId]: updatedSubjects,
+      };
+    });
+  };
+
   // Tuition updates
   const handleAddFee = (fee: TuitionFee) => {
     setTuitionFees((prev) => [fee, ...prev]);
@@ -603,7 +645,9 @@ export default function App() {
               students={students}
               classes={classes}
               examScores={examScores}
+              classSubjectsMap={classSubjectsMap}
               onSaveScores={handleSaveScores}
+              onUpdateClassSubjects={handleUpdateClassSubjects}
               onViewReportCard={handleOpenReportCard}
               lang={lang}
             />
@@ -614,6 +658,7 @@ export default function App() {
               students={students}
               classes={classes}
               examScores={examScores}
+              classSubjectsMap={classSubjectsMap}
               selectedStudentId={reportCardStudentId}
               onBack={() => setCurrentTab('students')}
               lang={lang}

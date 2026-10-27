@@ -27,23 +27,68 @@
 }
 
 @media print {
-  body {
+  html, body {
     background: white !important;
-    color: black !important;
+    color: #0f172a !important;
     font-size: 11pt;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  .no-print {
+  
+  /* Hide standard non-printable UI elements */
+  nav,
+  aside,
+  header,
+  .no-print,
+  .no-print * {
     display: none !important;
   }
+  
   .print-only {
     display: block !important;
   }
+
   .print-shadow-none {
     box-shadow: none !important;
     border: 1px solid #94a3b8 !important;
   }
+
+  /* Reset fixed modals during print if direct window.print is used */
+  .fixed.inset-0 {
+    position: static !important;
+    inset: auto !important;
+    background: transparent !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Specific element printing isolation */
+  body.is-printing-target * {
+    visibility: hidden !important;
+  }
+  body.is-printing-target .printable-active-area,
+  body.is-printing-target .printable-active-area * {
+    visibility: visible !important;
+  }
+  body.is-printing-target .printable-active-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
   @page {
     margin: 1.2cm;
     size: A4 portrait;
   }
 }
+

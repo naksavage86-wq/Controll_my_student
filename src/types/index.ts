@@ -82,6 +82,7 @@ export interface Subject {
   code: string;
   coefficient: number; // មេគុណ (e.g. Khmer=2, Math=2, others=1)
   maxScore: number; // e.g. 50 or 100
+  isActive?: boolean; // បើក/បិទ មុខវិជ្ជារៀនឬអត់ក្នុងថ្នាក់នីមួយៗ
 }
 
 export interface StudentSubjectScore {
